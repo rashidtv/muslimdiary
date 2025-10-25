@@ -32,8 +32,9 @@ const PrayerTimes = () => {
   const [zone, setZone] = useState('');
   const [locationName, setLocationName] = useState('');
   
-  // Prevent double execution
+  // Enhanced prevention for double execution
   const hasFetched = useRef(false);
+  const initialLoadRef = useRef(true);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -108,13 +109,24 @@ const PrayerTimes = () => {
     }
   };
 
-  // Single useEffect to prevent double execution
+  // Enhanced single useEffect to prevent double execution
   useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      fetchPrayerTimes();
+    // Only run on initial load, not on re-renders
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      
+      // Add a small delay to ensure component is fully mounted
+      const timer = setTimeout(() => {
+        if (!hasFetched.current) {
+          hasFetched.current = true;
+          console.log('🔄 Initial prayer times fetch');
+          fetchPrayerTimes();
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once
 
   useEffect(() => {
     if (prayerTimes) {
@@ -123,13 +135,21 @@ const PrayerTimes = () => {
   }, [prayerTimes]);
 
   const fetchPrayerTimes = async () => {
+    // Prevent multiple simultaneous calls
+    if (loading) {
+      console.log('⏳ Prayer times fetch already in progress, skipping...');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
+      console.log('📍 Fetching zone information...');
       const { zone: currentZone, locationName: currentLocationName } = await getCurrentZone();
       setZone(currentZone);
       setLocationName(currentLocationName);
 
+      console.log('🕌 Fetching prayer times for zone:', currentZone);
       const response = await fetch(`${API_BASE}/api/prayertimes/${currentZone}`);
       
       if (!response.ok) {
@@ -142,11 +162,12 @@ const PrayerTimes = () => {
         setPrayerTimes(data.data);
         // Store successful zone for future fallback
         localStorage.setItem('lastKnownZone', currentZone);
+        console.log('✅ Prayer times loaded successfully');
       } else {
         throw new Error(data.error || 'No prayer times data received');
       }
     } catch (err) {
-      console.error('Prayer times fetch error:', err);
+      console.error('❌ Prayer times fetch error:', err);
       setError('Failed to load prayer times: ' + err.message);
     } finally {
       setLoading(false);
