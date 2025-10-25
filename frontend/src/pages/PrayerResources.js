@@ -35,6 +35,11 @@ const PrayerResources = () => {
     getQiblaAngle
   } = useCompass();
 
+  // Use production backend URL
+  const API_BASE = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:5000' 
+    : 'https://muslimdiarybackend.onrender.com';
+
   useEffect(() => {
     if (!userLocation) {
       getLocation();
@@ -122,53 +127,53 @@ const PrayerResources = () => {
     return 'Your Location';
   };
 
-const getLocationName = async (latitude, longitude) => {
-  try {
-    console.log('📍 Getting location via proxy:', latitude, longitude);
-    
-    // Use backend proxy instead of direct OpenStreetMap call
-    const response = await fetch(
-      `http://localhost:5000/api/nominatim-proxy?lat=${latitude}&lon=${longitude}&format=json&zoom=10&addressdetails=1`
-    );
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch location name from proxy');
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.address) {
-      const address = data.address;
+  const getLocationName = async (latitude, longitude) => {
+    try {
+      console.log('📍 Getting location via proxy:', latitude, longitude);
       
-      // Get intelligently cleaned location name
-      const cleanName = getCleanLocationName(address);
-      setLocationName(cleanName);
+      // Use backend proxy with correct production URL
+      const response = await fetch(
+        `${API_BASE}/api/nominatim-proxy?lat=${latitude}&lon=${longitude}&format=json&zoom=10&addressdetails=1`
+      );
       
-      // Store for Prayer Times to use
-      const locationData = {
-        cleanName,
-        rawAddress: address,
-        timestamp: new Date().toISOString(),
-        coordinates: { latitude, longitude }
-      };
+      if (!response.ok) {
+        throw new Error('Failed to fetch location name from proxy');
+      }
       
-      localStorage.setItem('userLocationData', JSON.stringify(locationData));
-      localStorage.setItem('userLocationName', cleanName);
+      const data = await response.json();
       
-      console.log('📍 Location found:', cleanName);
-      
-    } else {
+      if (data && data.address) {
+        const address = data.address;
+        
+        // Get intelligently cleaned location name
+        const cleanName = getCleanLocationName(address);
+        setLocationName(cleanName);
+        
+        // Store for Prayer Times to use
+        const locationData = {
+          cleanName,
+          rawAddress: address,
+          timestamp: new Date().toISOString(),
+          coordinates: { latitude, longitude }
+        };
+        
+        localStorage.setItem('userLocationData', JSON.stringify(locationData));
+        localStorage.setItem('userLocationName', cleanName);
+        
+        console.log('📍 Location found:', cleanName);
+        
+      } else {
+        const fallbackName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        setLocationName(fallbackName);
+        localStorage.setItem('userLocationName', fallbackName);
+      }
+    } catch (error) {
+      console.log('Error getting location name:', error);
       const fallbackName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
       setLocationName(fallbackName);
       localStorage.setItem('userLocationName', fallbackName);
     }
-  } catch (error) {
-    console.log('Error getting location name:', error);
-    const fallbackName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-    setLocationName(fallbackName);
-    localStorage.setItem('userLocationName', fallbackName);
-  }
-};
+  };
 
   const getLocation = () => {
     setLoading(true);
