@@ -49,7 +49,7 @@ const PrayerTimes = () => {
           const { latitude, longitude } = parsedData.coordinates;
           const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? 'http://localhost:5000' 
-            : 'https://muslimdailybackend.onrender.com';
+            : 'https://muslimdiarybackend.onrender.com';
 
           const response = await fetch(`${API_BASE}/api/prayertimes/coordinates/${latitude}/${longitude}`);
           if (response.ok) {
@@ -74,7 +74,7 @@ const PrayerTimes = () => {
             try {
               const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? 'http://localhost:5000' 
-                : 'https://muslimdailybackend.onrender.com';
+                : 'https://muslimdiarybackend.onrender.com';
 
               const response = await fetch(`${API_BASE}/api/prayertimes/coordinates/${latitude}/${longitude}`);
               if (response.ok) {
@@ -128,7 +128,7 @@ const PrayerTimes = () => {
 
       const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:5000' 
-        : 'https://muslimdailybackend.onrender.com';
+        : 'https://muslimdiarybackend.onrender.com';
 
       const response = await fetch(`${API_BASE}/api/prayertimes/${currentZone}`);
       
