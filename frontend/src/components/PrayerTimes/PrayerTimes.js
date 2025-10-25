@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -31,12 +31,20 @@ const PrayerTimes = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [zone, setZone] = useState('');
   const [locationName, setLocationName] = useState('');
+  
+  // Prevent double execution
+  const hasFetched = useRef(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   const isSmallMobile = useMediaQuery('(max-width: 400px)');
   const isVerySmallMobile = useMediaQuery('(max-width: 360px)');
+
+  // Use production backend URL
+  const API_BASE = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:5000' 
+    : 'https://muslimdiarybackend.onrender.com';
 
   // Get user's current zone from coordinates with intelligent fallback
   const getCurrentZone = async () => {
@@ -47,10 +55,6 @@ const PrayerTimes = () => {
         const parsedData = JSON.parse(locationData);
         if (parsedData.coordinates) {
           const { latitude, longitude } = parsedData.coordinates;
-          const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:5000' 
-            : 'https://muslimdiarybackend.onrender.com';
-
           const response = await fetch(`${API_BASE}/api/prayertimes/coordinates/${latitude}/${longitude}`);
           if (response.ok) {
             const data = await response.json();
@@ -72,10 +76,6 @@ const PrayerTimes = () => {
           async (position) => {
             const { latitude, longitude } = position.coords;
             try {
-              const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'http://localhost:5000' 
-                : 'https://muslimdiarybackend.onrender.com';
-
               const response = await fetch(`${API_BASE}/api/prayertimes/coordinates/${latitude}/${longitude}`);
               if (response.ok) {
                 const data = await response.json();
@@ -108,8 +108,12 @@ const PrayerTimes = () => {
     }
   };
 
+  // Single useEffect to prevent double execution
   useEffect(() => {
-    fetchPrayerTimes();
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchPrayerTimes();
+    }
   }, []);
 
   useEffect(() => {
@@ -125,10 +129,6 @@ const PrayerTimes = () => {
       const { zone: currentZone, locationName: currentLocationName } = await getCurrentZone();
       setZone(currentZone);
       setLocationName(currentLocationName);
-
-      const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5000' 
-        : 'https://muslimdiarybackend.onrender.com';
 
       const response = await fetch(`${API_BASE}/api/prayertimes/${currentZone}`);
       
@@ -390,7 +390,7 @@ const PrayerTimes = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: { xs: 'stretch', sm: 'flex-start' },
-            mb: 1, // Reduced margin since font is smaller
+            mb: 1,
             flexDirection: { xs: 'column', sm: 'row' },
             gap: { xs: 1.5, sm: 1 }
           }}>
@@ -405,7 +405,7 @@ const PrayerTimes = () => {
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                mb: 0.5, // Reduced margin
+                mb: 0.5,
                 flexWrap: 'wrap',
                 gap: 1
               }}>
@@ -433,9 +433,7 @@ const PrayerTimes = () => {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       flex: 1,
-                      // Smaller font size same as Zone
                       fontSize: locationFontSize,
-                      // Ensure minimum readable size
                       minHeight: '1.2em'
                     }}
                   >
@@ -478,7 +476,7 @@ const PrayerTimes = () => {
                     disabled={refreshing}
                     startIcon={<Refresh />}
                     variant="outlined"
-                    size="small" // Smaller button to match smaller text
+                    size="small"
                     sx={{
                       color: 'white',
                       borderColor: 'rgba(255,255,255,0.3)',
@@ -507,7 +505,6 @@ const PrayerTimes = () => {
                   backgroundColor: 'rgba(255,255,255,0.2)', 
                   color: 'white',
                   borderColor: 'rgba(255,255,255,0.3)',
-                  // Same font size as location name
                   fontSize: locationFontSize,
                   height: { xs: 20, sm: 22 },
                   alignSelf: 'flex-start',

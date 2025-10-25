@@ -1,6 +1,6 @@
 {
   "short_name": "Muslim Diary",
-  "name": "Muslim Diary - Prayer Times & Qibla",
+  "name": "Muslim Diary",
   "icons": [
     {
       "src": "icons/icon-192x192.png",
@@ -21,5 +21,5 @@
   "background_color": "#ffffff",
   "orientation": "portrait",
   "scope": "/",
-  "description": "Malaysia Prayer Times, Qibla Direction & Muslim Practice Tracker"
+  "description": "Your daily Muslim companion for prayer times and tracking"
 }

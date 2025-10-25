@@ -5,21 +5,44 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     
     <!-- PWA META TAGS -->
-    <meta name="theme-color" content="#3f51b5" />
+    <meta name="theme-color" content="#1976d2" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Your daily Muslim companion for prayer times and tracking" />
     
     <!-- EDGE SPECIFIC -->
-    <meta name="application-name" content="Muslim Daily">
-    <meta name="msapplication-TileColor" content="#3f51b5">
+    <meta name="application-name" content="Muslim Diary">
+    <meta name="msapplication-TileColor" content="#1976d2">
     
-    <!-- MANIFEST BACK (MINIMAL) -->
+    <!-- APPLE/IOS SPECIFIC -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Muslim Diary">
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
+    
+    <!-- MANIFEST -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     
-    <title>Muslim Daily</title>
+    <title>Muslim Diary</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    
+    <!-- iOS Install Prompt -->
+    <div id="ios-install-prompt" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #1976d2; color: white; padding: 15px; text-align: center; z-index: 1000; border-top: 2px solid #0D47A1;">
+      <p style="margin: 0; font-size: 14px; font-weight: 500;">
+        Tap <span style="font-weight: bold;">Share</span> → <span style="font-weight: bold;">Add to Home Screen</span> to install
+      </p>
+      <button onclick="document.getElementById('ios-install-prompt').style.display='none'" style="background: white; color: #1976d2; border: none; padding: 5px 10px; border-radius: 4px; margin-left: 10px; font-weight: bold; cursor: pointer;">✕</button>
+    </div>
+
+    <script>
+      // Show iOS install prompt
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone) {
+        setTimeout(() => {
+          document.getElementById('ios-install-prompt').style.display = 'block';
+        }, 5000);
+      }
+    </script>
   </body>
 </html>
