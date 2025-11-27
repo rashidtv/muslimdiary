@@ -1,6 +1,56 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const NodeCache = require('node-cache'); // Require the package
+const locationCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
+
+app.get('/api/nominatim-proxy', async (req, res) => {
+  try {
+    const { lat, lon, format, zoom, addressdetails } = req.query;
+    
+    // Validate parameters
+    if (!lat || !lon) {
+      return res.status(400).json({ error: 'Missing lat/lon parameters' });
+    }
+
+    // Create a unique cache key for these coordinates
+    const cacheKey = `loc-${lat}-${lon}`;
+    
+    // Check if response is already cached
+    const cachedResponse = locationCache.get(cacheKey);
+    if (cachedResponse) {
+      console.log('✅ Returning cached location data');
+      return res.json(cachedResponse);
+    }
+
+    console.log('🌍 Fetching new data from OpenStreetMap');
+    const axios = require('axios');
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=${format || 'json'}&lat=${lat}&lon=${lon}&zoom=${zoom || 10}&addressdetails=${addressdetails || 1}`,
+      {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'MuslimDiaryApp/2.4.0 (https://muslimdiary-whur.onrender.com)',
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    // Cache the successful response
+    locationCache.set(cacheKey, response.data);
+    console.log('✅ OpenStreetMap Proxy Success, response cached');
+
+    res.json(response.data);
+    
+  } catch (error) {
+    console.error('❌ OpenStreetMap Proxy Error:', error.message);
+    // Don't cache errors, but ensure they don't block the app
+    res.status(500).json({ 
+      error: 'Failed to fetch location data',
+      details: error.message 
+    });
+  }
+});
 
 // Configuration constants
 const JAKIM_CONFIG = {

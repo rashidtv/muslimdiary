@@ -41,6 +41,20 @@ const makeApiRequest = async (url, options = {}, retryCount = 0) => {
   }
 };
 
+// This function should NOT block the prayer times display
+export const getLocationName = async (latitude, longitude) => {
+  const API_BASE = your_api_base_url_here;
+  try {
+    const response = await fetch(`${API_BASE}/api/nominatim-proxy?lat=${latitude}&lon=${longitude}`);
+    if (!response.ok) throw new Error('Proxy request failed');
+    const data = await response.json();
+    return data.display_name || `Zone ${zoneCode}`; // Return the human-readable name
+  } catch (error) {
+    console.warn('Location name fetch failed, using zone as fallback:', error);
+    return `Zone ${zoneCode}`; // Graceful fallback
+  }
+};
+
 // Main prayer times calculation function
 export const calculatePrayerTimes = async (latitude, longitude) => {
   try {
