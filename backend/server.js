@@ -550,10 +550,10 @@ process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, shutting down gracefully');
   server.close(() => {
     console.log('✅ HTTP server closed');
-    mongoose.connection.close(false, () => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
-    });
+    mongoose.connection.close(false).then(() => {
+  console.log('✅ MongoDB connection closed');
+  process.exit(0);
+});
   });
 });
 
@@ -561,10 +561,10 @@ process.on('SIGINT', () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
   server.close(() => {
     console.log('✅ HTTP server closed');
-    mongoose.connection.close(false, () => {
-      console.log('✅ MongoDB connection closed');
-      process.exit(0);
-    });
+   mongoose.connection.close(false).then(() => {
+  console.log('✅ MongoDB connection closed');
+  process.exit(0);
+});
   });
 });
 

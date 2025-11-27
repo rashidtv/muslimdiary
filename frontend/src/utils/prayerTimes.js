@@ -43,7 +43,7 @@ const makeApiRequest = async (url, options = {}, retryCount = 0) => {
 
 // This function should NOT block the prayer times display
 export const getLocationName = async (latitude, longitude) => {
-  const API_BASE = your_api_base_url_here;
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://muslimdiarybackend.onrender.com';
   try {
     const response = await fetch(`${API_BASE}/api/nominatim-proxy?lat=${latitude}&lon=${longitude}`);
     if (!response.ok) throw new Error('Proxy request failed');
