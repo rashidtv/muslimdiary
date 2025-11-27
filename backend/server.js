@@ -2,32 +2,22 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const prayerNotificationsRoutes = require('./routes/prayerNotifications');
+const prayerTimesRoutes = require('./routes/prayerTimes');
+const authRoutes = require('./routes/auth'); // Use the separate auth routes
 require('dotenv').config();
 
 const app = express();
 
-// ==================== CRITICAL RENDER FIXES ====================
-// Add these settings for Render deployment
+// ==================== SECURITY CONFIGURATION ====================
 app.set('trust proxy', 1); // Trust Render's proxy
 
-// Health check with NO database dependency (for initial deployment)
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'Server is running',
-    timestamp: new Date().toISOString(),
-    version: '2.4.0'
-  });
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
 });
-
-// Simple test endpoint without DB
-app.get('/api/test', (req, res) => {
-  res.json({ 
-    message: 'Backend is working!',
-    timestamp: new Date().toISOString()
-  });
-});
-// ==================== END CRITICAL FIXES ====================
 
 // ==================== ENHANCED CORS CONFIGURATION ====================
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
@@ -69,10 +59,36 @@ app.use(cors(corsOptions));
 // Handle preflight requests globally
 app.options('*', cors(corsOptions));
 
-app.use(express.json());
+// ==================== MIDDLEWARE ====================
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Proxy route for OpenStreetMap Nominatim API (to fix CORS)
-// ==================== CORS PROXY FOR OPENSTREETMAP ====================
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// ==================== CRITICAL HEALTH ENDPOINTS (No DB Dependency) ====================
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    version: '2.4.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Backend is working!',
+    timestamp: new Date().toISOString(),
+    version: '2.4.0'
+  });
+});
+
+// ==================== PROXY ROUTES ====================
 app.get('/api/nominatim-proxy', async (req, res) => {
   try {
     const { lat, lon, format, zoom, addressdetails } = req.query;
@@ -86,22 +102,20 @@ app.get('/api/nominatim-proxy', async (req, res) => {
       });
     }
 
-    // Use axios instead of fetch (fetch is not available in Node.js by default)
     const axios = require('axios');
     const response = await axios.get(
       `https://nominatim.openstreetmap.org/reverse?format=${format || 'json'}&lat=${lat}&lon=${lon}&zoom=${zoom || 10}&addressdetails=${addressdetails || 1}`,
       {
-        timeout: 10000, // 10 second timeout
+        timeout: 10000,
         headers: {
-          'User-Agent': 'MuslimDailyApp/1.0 (contact@example.com)',
+          'User-Agent': 'MuslimDiaryApp/2.4.0 (https://muslimdiary-whur.onrender.com)',
           'Accept': 'application/json'
         }
       }
     );
     
-    console.log('✅ OpenStreetMap Proxy Success:', response.data.display_name || 'Location found');
+    console.log('✅ OpenStreetMap Proxy Success');
     
-    // Send the response back to frontend
     res.json(response.data);
     
   } catch (error) {
@@ -113,18 +127,20 @@ app.get('/api/nominatim-proxy', async (req, res) => {
   }
 });
 
-// Enhanced startup logging
-console.log('🚀 Muslim Daily Backend Starting...');
+// ==================== DATABASE CONNECTION ====================
+console.log('🚀 Muslim Diary Backend Starting...');
 console.log('📅 Startup Time:', new Date().toISOString());
+console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 console.log('🗄️  MongoDB Persistent Storage');
-console.log('💰 COMPLETELY FREE - No costs, no subscriptions');
 
-// MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/muslimdiary';
 
+// Enhanced MongoDB connection with better error handling
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
 })
 .then(() => {
   console.log('✅ MongoDB Connected Successfully');
@@ -132,37 +148,37 @@ mongoose.connect(MONGODB_URI, {
 })
 .catch((error) => {
   console.error('❌ MongoDB connection error:', error);
-  process.exit(1);
+  console.log('⚠️  Continuing without database connection...');
 });
 
 // MongoDB connection events
 mongoose.connection.on('connected', () => {
   console.log('✅ MongoDB Connected Successfully');
-  console.log('🏠 Database:', mongoose.connection.name);
 });
 
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB connection error:', err);
 });
 
-// Import models
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ MongoDB disconnected');
+});
+
+// ==================== IMPORT MODELS ====================
 const User = require('./models/User');
 
 // ==================== HEALTH MONITORING ENDPOINTS ====================
-
-// Health check endpoint 1 - Basic
 app.get('/api/health1', (req, res) => {
   res.json({ 
     status: 'healthy',
-    service: 'Muslim Daily Backend',
+    service: 'Muslim Diary Backend',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '2.4.0',
     environment: process.env.NODE_ENV || 'development',
     storage: 'mongodb-persistent'
   });
 });
 
-// Health check endpoint 2 - Memory usage
 app.get('/api/health2', (req, res) => {
   const used = process.memoryUsage();
   res.json({ 
@@ -179,7 +195,6 @@ app.get('/api/health2', (req, res) => {
   });
 });
 
-// Health check endpoint 3 - Detailed stats
 app.get('/api/health3', async (req, res) => {
   try {
     const userCount = await User.countDocuments();
@@ -192,7 +207,7 @@ app.get('/api/health3', async (req, res) => {
         database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
       },
       timestamp: new Date().toISOString(),
-      service: 'Muslim Daily API - MongoDB Edition'
+      service: 'Muslim Diary API - MongoDB Edition'
     });
   } catch (error) {
     res.status(500).json({ 
@@ -203,7 +218,6 @@ app.get('/api/health3', async (req, res) => {
   }
 });
 
-// Warmup endpoint - Simulates real API call
 app.get('/api/warmup', async (req, res) => {
   try {
     const userCount = await User.countDocuments();
@@ -212,7 +226,7 @@ app.get('/api/warmup', async (req, res) => {
       status: 'warmed up',
       users: userCount,
       timestamp: new Date().toISOString(),
-      message: 'Muslim Daily backend is ready to handle requests',
+      message: 'Muslim Diary backend is ready to handle requests',
       database: 'connected'
     });
   } catch (error) {
@@ -225,19 +239,40 @@ app.get('/api/warmup', async (req, res) => {
   }
 });
 
-// Simple ping endpoint
+// Enhanced ping endpoint
 app.get('/api/ping', (req, res) => {
   res.json({ 
     pong: true,
     timestamp: new Date().toISOString(),
-    service: 'Muslim Daily API',
-    version: '1.0.0',
+    service: 'Muslim Diary API',
+    version: '2.4.0',
     message: 'Alhamdulillah! Serving the Muslim community for free!',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// ==================== ROUTES ====================
+// Enhanced health check endpoint
+app.get('/api/health', async (req, res) => {
+  const healthCheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2.4.0',
+    environment: process.env.NODE_ENV || 'development',
+    services: {
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      memory: {
+        used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+        total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+      },
+      uptime: `${Math.round(process.uptime())}s`
+    }
+  };
+
+  res.json(healthCheck);
+});
+
+// ==================== ROUTES CONFIGURATION ====================
 
 // Root endpoint
 app.get('/', async (req, res) => {
@@ -245,8 +280,8 @@ app.get('/', async (req, res) => {
     const userCount = await User.countDocuments();
     
     res.json({ 
-      message: '🕌 MuslimDaily API - Free Muslim Practice Companion',
-      version: '1.0.0',
+      message: '🕌 Muslim Diary API - Free Muslim Practice Companion',
+      version: '2.4.0',
       status: 'Alhamdulillah! Serving the Muslim community for free!',
       features: [
         'Prayer time tracking',
@@ -262,253 +297,30 @@ app.get('/', async (req, res) => {
         serverTime: new Date().toISOString(),
         database: 'MongoDB Persistent'
       },
-      healthEndpoints: [
-        '/api/health1',
-        '/api/health2', 
-        '/api/health3',
-        '/api/warmup',
-        '/api/ping'
-      ]
+      endpoints: {
+        auth: ['/api/auth/login', '/api/auth/register', '/api/auth/me'],
+        prayer: ['/api/prayertimes/:zone', '/api/prayertimes/coordinates/:lat/:lng'],
+        user: ['/api/user/progress', '/api/user/location'],
+        health: ['/api/health', '/api/ping', '/health']
+      },
+      documentation: 'https://github.com/your-repo/docs'
     });
   } catch (error) {
     res.json({ 
-      message: '🕌 MuslimDaily API - Free Muslim Practice Companion',
+      message: '🕌 Muslim Diary API - Free Muslim Practice Companion',
       status: 'Starting up...',
-      error: error.message
+      error: error.message,
+      version: '2.4.0'
     });
   }
 });
 
-// Enhanced health check endpoint
-app.get('/api/health', async (req, res) => {
-  const healthCheck = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '2.4.0',
-    environment: process.env.NODE_ENV,
-    services: {
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      memory: {
-        used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-        total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
-      },
-      uptime: `${Math.round(process.uptime())}s`
-    }
-  };
+// ==================== API ROUTES ====================
 
-  res.json(healthCheck);
-});
-
-// ==================== AUTHENTICATION ROUTES ====================
-
-// Register endpoint
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    
-    if (!email || !password || !name) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email, password, and name are required' 
-      });
-    }
-
-    // Basic email validation
-    if (!email.includes('@')) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid email format' 
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User already exists' 
-      });
-    }
-
-    // Create user
-    const user = new User({
-      email: email.toLowerCase(),
-      name: name,
-      password: password, // Will be hashed by the User model
-      zone: 'SGR01',
-      location: {
-        latitude: null,
-        longitude: null,
-        autoDetected: false
-      },
-      prayerProgress: {
-        fajr: [],
-        dhuhr: [],
-        asr: [],
-        maghrib: [],
-        isha: []
-      }
-    });
-
-    await user.save();
-
-    // Generate token (simple version for now)
-    const jwt = require('jsonwebtoken');
-    const token = jwt.sign(
-      { userId: user._id }, 
-      process.env.JWT_SECRET || 'muslim-daily-secret-key', 
-      { expiresIn: '7d' }
-    );
-
-    console.log(`✅ New user registered: ${email}`);
-
-    res.json({
-      success: true,
-      token: token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        zone: user.zone,
-        location: user.location
-      }
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Registration failed: ' + error.message
-    });
-  }
-});
-
-// Login endpoint
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email and password are required' 
-      });
-    }
-
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid credentials' 
-      });
-    }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid credentials' 
-      });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-    
-    // Generate token
-    const jwt = require('jsonwebtoken');
-    const token = jwt.sign(
-      { userId: user._id }, 
-      process.env.JWT_SECRET || 'muslim-daily-secret-key', 
-      { expiresIn: '7d' }
-    );
-
-    console.log(`✅ User logged in: ${email}`);
-
-    res.json({
-      success: true,
-      token: token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        zone: user.zone,
-        location: user.location
-      }
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Login failed: ' + error.message
-    });
-  }
-});
-
-// Get current user
-app.get('/api/auth/me', async (req, res) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'No token provided' 
-      });
-    }
-
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'muslim-daily-secret-key');
-    
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'User not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        zone: user.zone,
-        location: user.location
-      }
-    });
-
-  } catch (error) {
-    res.status(401).json({ 
-      success: false, 
-      error: 'Invalid token' 
-    });
-  }
-});
-
-// Auth test endpoint
-app.get('/api/auth/test', async (req, res) => {
-  try {
-    const userCount = await User.countDocuments();
-    
-    res.json({ 
-      success: true, 
-      message: 'Auth routes are working!',
-      usersCount: userCount,
-      timestamp: new Date().toISOString(),
-      database: 'MongoDB'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
+// Use imported route files (CLEAN - no duplicate routes)
+app.use('/api/auth', authRoutes);
+app.use('/api/prayertimes', prayerTimesRoutes);
+app.use('/api/notifications', prayerNotificationsRoutes);
 
 // ==================== USER PROFILE ROUTES ====================
 
@@ -525,7 +337,13 @@ app.put('/api/user/location', async (req, res) => {
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'muslim-daily-secret-key');
+    
+    // SECURITY FIX: Remove hardcoded fallback secret
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -554,6 +372,7 @@ app.put('/api/user/location', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Location update error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to update location: ' + error.message
@@ -574,7 +393,13 @@ app.post('/api/user/prayer', async (req, res) => {
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'muslim-daily-secret-key');
+    
+    // SECURITY FIX: Remove hardcoded fallback secret
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -596,13 +421,11 @@ app.post('/api/user/prayer', async (req, res) => {
     const prayerTime = new Date(timestamp || new Date());
 
     if (completed) {
-      // Add to prayer progress
       if (!user.prayerProgress[prayer]) {
         user.prayerProgress[prayer] = [];
       }
       user.prayerProgress[prayer].push(prayerTime);
     } else {
-      // Remove from prayer progress (most recent entry)
       if (user.prayerProgress[prayer] && user.prayerProgress[prayer].length > 0) {
         user.prayerProgress[prayer].pop();
       }
@@ -638,7 +461,13 @@ app.get('/api/user/progress', async (req, res) => {
     }
 
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'muslim-daily-secret-key');
+    
+    // SECURITY FIX: Remove hardcoded fallback secret
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -660,6 +489,7 @@ app.get('/api/user/progress', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Progress fetch error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get prayer progress: ' + error.message
@@ -667,47 +497,102 @@ app.get('/api/user/progress', async (req, res) => {
   }
 });
 
-app.use('/api/notifications', prayerNotificationsRoutes);
+// ==================== ERROR HANDLING MIDDLEWARE ====================
 
-// ==================== EXISTING PRAYER TIMES ROUTES ====================
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.originalUrl} not found`,
+    timestamp: new Date().toISOString()
+  });
+});
 
-// Import prayer times routes
-const prayerTimesRoutes = require('./routes/prayerTimes');
-app.use('/api/prayertimes', prayerTimesRoutes);
+// Global error handling middleware
+app.use((error, req, res, next) => {
+  console.error('🚨 Global Error Handler:', error);
+
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      details: error.message
+    });
+  }
+
+  if (error.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid token'
+    });
+  }
+
+  if (error.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Token expired'
+    });
+  }
+
+  // Default error
+  res.status(error.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : error.message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
+  });
+});
 
 // ==================== GRACEFUL SHUTDOWN HANDLING ====================
 
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, shutting down gracefully');
-  mongoose.connection.close(false, () => {
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    mongoose.connection.close(false, () => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
   });
 });
 
 process.on('SIGINT', () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
-  mongoose.connection.close(false, () => {
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    mongoose.connection.close(false, () => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
   });
+});
+
+// Unhandled promise rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🚨 Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+// Uncaught exception handler
+process.on('uncaughtException', (error) => {
+  console.error('🚨 Uncaught Exception:', error);
+  process.exit(1);
 });
 
 // ==================== SERVER START ====================
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🕌 MuslimDaily server running on port ${PORT}`);
+  console.log(`🕌 Muslim Diary server running on port ${PORT}`);
   console.log(`💰 COMPLETELY FREE - No costs, no subscriptions`);
-  console.log(`🌍 API available at: http://localhost:${PORT}`);
-  console.log(`🗄️  MongoDB Persistent Storage Active`);
-  console.log(`🏥 Health monitoring endpoints ready for UptimeRobot`);
-  console.log(`📋 Available health endpoints:`);
-  console.log(`   GET  /health (Simple - No DB dependency)`);
-  console.log(`   GET  /api/health1`);
-  console.log(`   GET  /api/health2`);
-  console.log(`   GET  /api/health3`);
-  console.log(`   GET  /api/warmup`);
-  console.log(`   GET  /api/ping`);
-  console.log(`   GET  /api/test`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Frontend URL: https://muslimdiary-whur.onrender.com`);
+  console.log(`🗄️  MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+  console.log(`🏥 Health monitoring endpoints ready`);
+  console.log(`📋 Available endpoints:`);
+  console.log(`   GET  /health (No DB dependency)`);
+  console.log(`   GET  /api/health (Full health check)`);
+  console.log(`   GET  /api/ping (Quick status)`);
+  console.log(`   GET  /api/prayertimes/:zone (Prayer times)`);
+  console.log(`   POST /api/auth/login (User login)`);
 });
