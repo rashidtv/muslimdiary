@@ -29,8 +29,46 @@ app.get('/api/test', (req, res) => {
 });
 // ==================== END CRITICAL FIXES ====================
 
-// Middleware
-app.use(cors());
+// ==================== ENHANCED CORS CONFIGURATION ====================
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : [
+      'https://muslimdiary-whur.onrender.com',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000'
+    ];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS Blocked Origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: ['X-Total-Count', 'X-API-Version'],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests globally
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Proxy route for OpenStreetMap Nominatim API (to fix CORS)
@@ -241,24 +279,24 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Health check (existing)
+// Enhanced health check endpoint
 app.get('/api/health', async (req, res) => {
-  try {
-    const userCount = await User.countDocuments();
-    
-    res.json({ 
-      success: true, 
-      message: 'Muslim Daily API is running!',
-      timestamp: new Date().toISOString(),
-      usersCount: userCount,
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
+  const healthCheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2.4.0',
+    environment: process.env.NODE_ENV,
+    services: {
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      memory: {
+        used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+        total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+      },
+      uptime: `${Math.round(process.uptime())}s`
+    }
+  };
+
+  res.json(healthCheck);
 });
 
 // ==================== AUTHENTICATION ROUTES ====================

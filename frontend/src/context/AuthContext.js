@@ -1,5 +1,23 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
+// Centralized configuration
+const API_CONFIG = {
+  development: {
+    baseURL: 'http://localhost:5000',
+    timeout: 10000
+  },
+  production: {
+    baseURL: 'https://muslimdiarybackend.onrender.com',
+    timeout: 15000
+  }
+};
+
+const getApiConfig = () => {
+  const isDevelopment = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1';
+  return isDevelopment ? API_CONFIG.development : API_CONFIG.production;
+};
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -15,102 +33,146 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
 
-  // Check backend status on startup
-  useEffect(() => {
-    checkBackendStatus();
-  }, []);
+  const apiConfig = getApiConfig();
 
-  const checkBackendStatus = async () => {
+  // Enhanced backend status check with retry logic
+  const checkBackendStatus = async (retryCount = 0) => {
     try {
-      const API_BASE = 'https://muslimdailybackend.onrender.com';
-      const response = await fetch(`${API_BASE}/api/ping`, {
+      console.log('🔍 Checking backend status...');
+      
+      const response = await fetch(`${apiConfig.baseURL}/api/ping`, {
         method: 'GET',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(5000)
       });
       
       if (response.ok) {
         setBackendStatus('online');
         console.log('✅ Backend is online');
+        return true;
       } else {
-        setBackendStatus('offline');
-        console.warn('⚠️ Backend responded with error');
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
+      console.warn('❌ Backend status check failed:', error.message);
+      
+      // Retry logic for backend warming up
+      if (retryCount < 2) {
+        console.log(`🔄 Retrying backend check (${retryCount + 1}/3)...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        return checkBackendStatus(retryCount + 1);
+      }
+      
       setBackendStatus('offline');
-      console.warn('❌ Backend is offline or starting up');
+      return false;
     }
   };
 
+  // Check backend status on startup
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('muslimDiary_user');
-    const token = localStorage.getItem('muslimDiary_token');
-    
-    if (storedUser && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('muslimDiary_user');
-        localStorage.removeItem('muslimDiary_token');
-      }
-    }
-    setLoading(false);
+    checkBackendStatus();
   }, []);
 
-  const login = async (email, password, retryCount = 0) => {
-    try {
-      // Dynamic API URL for different environments
-      const getApiBase = () => {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return 'http://localhost:5000';
+  // Load user from localStorage on component mount
+  useEffect(() => {
+    const initializeAuth = () => {
+      try {
+        const storedUser = localStorage.getItem('muslimDiary_user');
+        const token = localStorage.getItem('muslimDiary_token');
+        
+        if (storedUser && token) {
+          const userData = JSON.parse(storedUser);
+          // Validate stored user data structure
+          if (userData && userData.id && userData.email) {
+            setUser(userData);
+            console.log('👤 User session restored from storage');
+          } else {
+            console.warn('Invalid user data in storage, clearing...');
+            clearStoredAuth();
+          }
         }
-        return 'https://muslimdailybackend.onrender.com';
-      };
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        clearStoredAuth();
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const API_BASE = getApiBase();
-      
-      console.log('🔐 Attempting login to:', `${API_BASE}/api/auth/login`);
-      
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
+    initializeAuth();
+  }, []);
+
+  // Clear stored authentication data
+  const clearStoredAuth = () => {
+    localStorage.removeItem('muslimDiary_user');
+    localStorage.removeItem('muslimDiary_token');
+    localStorage.removeItem('lastKnownZone');
+  };
+
+  // Enhanced API request with proper error handling
+  const makeApiRequest = async (endpoint, options = {}, retryCount = 0) => {
+    const url = `${apiConfig.baseURL}${endpoint}`;
+    
+    try {
+      const defaultOptions = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
+        signal: AbortSignal.timeout(apiConfig.timeout)
+      };
 
-      console.log('📡 Login response status:', response.status);
-      
-      // Handle backend warming up (524 status on Render)
+      const response = await fetch(url, { ...defaultOptions, ...options });
+
+      // Handle backend warming up (Render specific)
       if (response.status === 524 || response.status === 503) {
-        if (retryCount < 3) {
-          console.log(`🔄 Backend is warming up, retry ${retryCount + 1}/3 in 3 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          return login(email, password, retryCount + 1);
+        if (retryCount < 2) {
+          console.log(`🔄 Backend warming up, retry ${retryCount + 1}/3...`);
+          await new Promise(resolve => setTimeout(resolve, 3000 * (retryCount + 1)));
+          return makeApiRequest(endpoint, options, retryCount + 1);
         } else {
-          throw new Error('Backend is taking too long to start. Please try again in a moment.');
+          throw new Error('Backend is starting up. Please try again in a moment.');
         }
       }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Login failed with status ${response.status}`);
+        const errorData = await response.json().catch(() => ({ 
+          error: `Request failed with status ${response.status}` 
+        }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      return await response.json();
+    } catch (error) {
+      // Handle timeout and network errors with retry
+      if ((error.name === 'TimeoutError' || error.message.includes('Failed to fetch')) && retryCount < 2) {
+        console.log(`🔄 Network issue, retry ${retryCount + 1}/3...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        return makeApiRequest(endpoint, options, retryCount + 1);
+      }
       
+      throw error;
+    }
+  };
+
+  const login = async (email, password) => {
+    try {
+      console.log('🔐 Attempting login...');
+      
+      const data = await makeApiRequest('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+
       if (data.success) {
-        console.log('✅ Login successful, user data:', data.user);
-        // Use ACTUAL user data from backend
+        console.log('✅ Login successful');
+        
         const userData = {
           id: data.user.id,
           name: data.user.name,
           email: data.user.email,
-          zone: data.user.zone
+          zone: data.user.zone || 'WLY01'
         };
         
+        // Update state and storage
         setUser(userData);
         localStorage.setItem('muslimDiary_user', JSON.stringify(userData));
         localStorage.setItem('muslimDiary_token', data.token);
@@ -123,19 +185,12 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Login error:', error);
       
-      // Handle timeout errors with retry
-      if (error.name === 'TimeoutError' && retryCount < 2) {
-        console.log(`🔄 Request timeout, retry ${retryCount + 1}/2 in 2 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return login(email, password, retryCount + 1);
-      }
-      
-      // If backend is completely down, provide helpful message
+      // Update backend status based on error type
       if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         setBackendStatus('offline');
         return { 
           success: false, 
-          error: 'Backend service is temporarily unavailable. Please try again in a moment.' 
+          error: 'Service temporarily unavailable. Please check your connection.' 
         };
       }
       
@@ -143,59 +198,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, retryCount = 0) => {
+  const register = async (name, email, password) => {
     try {
-      // Dynamic API URL for different environments
-      const getApiBase = () => {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return 'http://localhost:5000';
-        }
-        return 'https://muslimdailybackend.onrender.com';
-      };
-
-      const API_BASE = getApiBase();
+      console.log('📝 Attempting registration...');
       
-      console.log('📝 Attempting registration to:', `${API_BASE}/api/auth/register`);
-      
-      const response = await fetch(`${API_BASE}/api/auth/register`, {
+      const data = await makeApiRequest('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        body: JSON.stringify({ name, email, password })
       });
 
-      console.log('📡 Registration response status:', response.status);
-      
-      // Handle backend warming up
-      if (response.status === 524 || response.status === 503) {
-        if (retryCount < 3) {
-          console.log(`🔄 Backend is warming up, retry ${retryCount + 1}/3 in 3 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          return register(name, email, password, retryCount + 1);
-        } else {
-          throw new Error('Backend is taking too long to start. Please try again in a moment.');
-        }
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Registration failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      
       if (data.success) {
-        console.log('✅ Registration successful, user data:', data.user);
-        // Use ACTUAL user data from backend
+        console.log('✅ Registration successful');
+        
         const userData = {
           id: data.user.id,
           name: data.user.name,
           email: data.user.email,
-          zone: data.user.zone
+          zone: data.user.zone || 'WLY01'
         };
         
+        // Update state and storage
         setUser(userData);
         localStorage.setItem('muslimDiary_user', JSON.stringify(userData));
         localStorage.setItem('muslimDiary_token', data.token);
@@ -208,19 +230,12 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Registration error:', error);
       
-      // Handle timeout errors with retry
-      if (error.name === 'TimeoutError' && retryCount < 2) {
-        console.log(`🔄 Request timeout, retry ${retryCount + 1}/2 in 2 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return register(name, email, password, retryCount + 1);
-      }
-      
-      // If backend is completely down
+      // Update backend status based on error type
       if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
         setBackendStatus('offline');
         return { 
           success: false, 
-          error: 'Backend service is temporarily unavailable. Please try again in a moment.' 
+          error: 'Service temporarily unavailable. Please check your connection.' 
         };
       }
       
@@ -229,9 +244,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('👋 Logging out user');
     setUser(null);
-    localStorage.removeItem('muslimDiary_user');
-    localStorage.removeItem('muslimDiary_token');
+    clearStoredAuth();
+  };
+
+  const refreshBackendStatus = async () => {
+    return await checkBackendStatus();
   };
 
   const value = {
@@ -241,7 +260,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     loading,
     backendStatus,
-    checkBackendStatus
+    checkBackendStatus: refreshBackendStatus
   };
 
   return (
