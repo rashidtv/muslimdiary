@@ -579,6 +579,8 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
+const startJakimCron = require("./utils/jakimCron");
+startJakimCron();
 // ==================== SERVER START ====================
 
 const PORT = process.env.PORT || 5000;
