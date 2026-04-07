@@ -1,0 +1,131 @@
+/* High Contrast Mode */
+.high-contrast {
+  --bg-primary: #000000 !important;
+  --bg-secondary: #1a1a1a !important;
+  --text-primary: #ffffff !important;
+  --text-secondary: #cccccc !important;
+  --accent: #ffff00 !important;
+  --border: #ffffff !important;
+}
+
+.high-contrast body {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.high-contrast .MuiCard-root {
+  background-color: var(--bg-secondary) !important;
+  border: 2px solid var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+.high-contrast .MuiButton-contained {
+  background-color: var(--accent) !important;
+  color: #000000 !important;
+  border: 2px solid var(--border) !important;
+}
+
+.high-contrast .MuiTypography-root {
+  color: var(--text-primary) !important;
+}
+
+.high-contrast .MuiAppBar-root {
+  background-color: var(--bg-secondary) !important;
+  border-bottom: 2px solid var(--border) !important;
+}
+
+.high-contrast .MuiPaper-root {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.high-contrast .MuiIconButton-root {
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.high-contrast .MuiMenuItem-root {
+  color: var(--text-primary) !important;
+}
+
+.high-contrast .MuiBottomNavigation-root {
+  background-color: var(--bg-secondary) !important;
+  border-top: 2px solid var(--border) !important;
+}
+
+/* Focus indicators for keyboard navigation */
+.MuiButton-root:focus,
+.MuiIconButton-root:focus,
+.MuiMenuItem-root:focus,
+.MuiSelect-root:focus,
+.MuiTextField-root:focus {
+  outline: 3px solid #0066cc !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast focus */
+.high-contrast .MuiButton-root:focus,
+.high-contrast .MuiIconButton-root:focus,
+.high-contrast .MuiMenuItem-root:focus {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Reduced motion for users with vestibular disorders */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Large text mode */
+.large-text {
+  font-size: 120% !important;
+}
+
+.large-text .MuiTypography-h4 {
+  font-size: 2.5rem !important;
+}
+
+.large-text .MuiTypography-h5 {
+  font-size: 2rem !important;
+}
+
+.large-text .MuiTypography-h6 {
+  font-size: 1.5rem !important;
+}
+
+.large-text .MuiTypography-body1 {
+  font-size: 1.2rem !important;
+}
+
+.large-text .MuiTypography-body2 {
+  font-size: 1.1rem !important;
+}
+
+.large-text .MuiButton-root {
+  font-size: 1.1rem !important;
+  padding: 12px 28px !important;
+}
+
+/* High contrast large text */
+.high-contrast.large-text {
+  --text-primary: #ffffff !important;
+  --text-secondary: #cccccc !important;
+}
