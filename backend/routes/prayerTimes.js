@@ -4,100 +4,176 @@ const NodeCache = require('node-cache');
 
 const router = express.Router();
 
-// Cache prayer times for 1 hour (adjust TTL as needed)
+// Cache prayer times for 1 hour
 const prayerCache = new NodeCache({ stdTTL: 3600 });
 
-// Enhanced JAKIM API client with timeout and retries
+// ✅ Malaysia Zone Mapping (JAKIM)
+const MALAYSIA_ZONES = {
+  "Kuala Lumpur": "WLY01",
+  "Putrajaya": "WLY01",
+  "Selangor": "WLY02",
+  "Johor": "JHR01",
+  "Kedah": "KDH01",
+  "Kelantan": "KTN01",
+  "Melaka": "MLK01",
+  "N. Sembilan": "NGS01",
+  "Pahang": "PHG01",
+  "Perak": "PRK01",
+  "Perlis": "PLS01",
+  "Penang": "PNG01",
+  "Sabah": "SBH01",
+  "Sarawak": "SWK01",
+  "Terengganu": "TRG01",
+  "Labuan": "LBN01"
+};
+
+// ✅ Helper: Determine JAKIM zone from OpenStreetMap result
+function detectZone(address) {
+  const state = address.state || address.city || address.region;
+  if (!state) return "WLY01";
+
+  for (const key of Object.keys(MALAYSIA_ZONES)) {
+    if (state.includes(key)) {
+      return MALAYSIA_ZONES[key];
+    }
+  }
+
+  // Default zone (KL)
+  return "WLY01";
+}
+
+// ✅ ✅ NEW ROUTE — Detect zone by coordinates
+router.get('/coordinates/:lat/:lng', async (req, res) => {
+  try {
+    const { lat, lng } = req.params;
+
+    console.log(`📍 Reverse geocoding: ${lat}, ${lng}`);
+
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+      {
+        headers: { "User-Agent": "MuslimDiary/3.0" }
+      }
+    );
+
+    const data = response.data;
+    const zone = detectZone(data.address || {});
+    const locationName = data.display_name || `Zone ${zone}`;
+
+    console.log(`✅ Coordinates detected zone: ${zone}`);
+
+    return res.json({
+      success: true,
+      data: {
+        zone,
+        locationName
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Coordinate lookup failed:", error.message);
+
+    return res.json({
+      success: false,
+      data: {
+        zone: "WLY01",
+        locationName: "Kuala Lumpur (Fallback)"
+      }
+    });
+  }
+});
+
+// ✅ Enhanced JAKIM API settings
 const JAKIM_CONFIG = {
-  timeout: 8000, // 8 second timeout
+  timeout: 8000,
   retries: 2,
-  retryDelay: 1000,
+  retryDelay: 1000
 };
 
 async function fetchPrayerTimesFromJakim(zoneCode) {
   const today = new Date();
-  const dateStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-  const url = `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat&period=date&zone=${zoneCode}&date=${dateStr}`;
+  const dateStr = `${today.getFullYear()}-${(today.getMonth() + 1)
+    .toString().padStart(2, "0")}-${today.getDate().toString().padStart(2, "0")}`;
+
+  const url = `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat`;
+  const params = `&period=date&zone=${zoneCode}&date=${dateStr}`;
 
   for (let attempt = 1; attempt <= JAKIM_CONFIG.retries + 1; attempt++) {
     try {
-      const response = await axios.get(url, {
+      const response = await axios.get(url + params, {
         timeout: JAKIM_CONFIG.timeout,
         headers: {
-          'User-Agent': 'MuslimDiaryApp/1.0',
-          'Accept': 'application/json',
+          "User-Agent": "Mozilla/5.0 (MuslimDiary/3.0)",
+          "Accept": "application/json"
         },
       });
 
       if (response.data?.prayerTime?.[0]) {
-        console.log(`✅ JAKIM API success for ${zoneCode} on attempt ${attempt}`);
+        console.log(`✅ JAKIM response OK for ${zoneCode}`);
         return response.data.prayerTime[0];
       }
-      throw new Error('Invalid response structure from JAKIM API');
+
+      throw new Error("Invalid JAKIM response structure");
 
     } catch (error) {
-      console.warn(`❌ JAKIM API attempt ${attempt} failed for ${zoneCode}:`, error.message);
-      
+      console.warn(`❌ JAKIM attempt ${attempt} failed:`, error.message);
+
       if (attempt <= JAKIM_CONFIG.retries) {
-        await new Promise(resolve => setTimeout(resolve, JAKIM_CONFIG.retryDelay * attempt));
-        continue; // Retry
+        await new Promise(r => setTimeout(r, JAKIM_CONFIG.retryDelay * attempt));
+        continue;
       }
-      throw error; // All retries failed
+
+      throw error;
     }
   }
 }
 
-// Main prayer times endpoint with caching
+// ✅ Main prayer times endpoint
 router.get('/:zoneCode', async (req, res) => {
   const { zoneCode } = req.params;
-  
+
   try {
-    // 1. Try to get from cache first
     const cacheKey = `prayer-${zoneCode}`;
-    const cachedTimes = prayerCache.get(cacheKey);
-    
-    if (cachedTimes) {
-      console.log(`📦 Serving cached prayer times for ${zoneCode}`);
+    const cached = prayerCache.get(cacheKey);
+
+    if (cached) {
       return res.json({
         success: true,
-        data: cachedTimes,
-        source: 'cache',
+        data: cached,
+        source: "cache",
         timestamp: new Date().toISOString()
       });
     }
 
-    // 2. Fetch from JAKIM API
-    console.log(`🔄 Fetching fresh prayer times for ${zoneCode} from JAKIM`);
-    const jakimData = await fetchPrayerTimesFromJakim(zoneCode);
-    
+    // Fetch from JAKIM
+    const jakim = await fetchPrayerTimesFromJakim(zoneCode);
+
     const prayerTimes = {
-      fajr: jakimData.fajr,
-      dhuhr: jakimData.dhuhr,
-      asr: jakimData.asr,
-      maghrib: jakimData.maghrib,
-      isha: jakimData.isha,
-      date: jakimData.date,
+      fajr: jakim.fajr,
+      dhuhr: jakim.dhuhr,
+      asr: jakim.asr,
+      maghrib: jakim.maghrib,
+      isha: jakim.isha,
+      date: jakim.date,
       zone: zoneCode
     };
 
-    // 3. Cache successful response
     prayerCache.set(cacheKey, prayerTimes);
-    
-    // 4. Return to client
+
     res.json({
       success: true,
       data: prayerTimes,
-      source: 'jakim-api',
+      source: "jakim-api",
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error(`❌ All prayer time fetch attempts failed for ${zoneCode}:`, error.message);
-    
+    console.error(`❌ Failed JAKIM fetch for ${zoneCode}:`, error.message);
+
     res.status(503).json({
       success: false,
-      error: 'Temporarily unable to fetch prayer times. Please try again shortly.',
-      source: 'error'
+      error: "Unable to fetch prayer times.",
+      source: "jakim-error"
     });
   }
 });
