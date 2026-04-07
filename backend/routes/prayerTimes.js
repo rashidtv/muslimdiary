@@ -8,7 +8,7 @@ const router = express.Router();
 // In-memory cache (1 hour)
 const prayerCache = new NodeCache({ stdTTL: 3600 });
 
-// ✅ Malaysia JAKIM Zones
+// ✅ Malaysia JAKIM Zones Mapping
 const MALAYSIA_ZONES = {
   "Kuala Lumpur": "WLY01",
   "Putrajaya": "WLY01",
@@ -29,7 +29,7 @@ const MALAYSIA_ZONES = {
   "Labuan": "LBN01"
 };
 
-// ✅ Detect JAKIM zone from reverse geocode
+// ✅ Detect proper zone from reverse geocode
 function detectZone(address) {
   const state = address.state || address.city || address.region;
   if (!state) return "WLY01";
@@ -41,7 +41,7 @@ function detectZone(address) {
   return "WLY01"; // Default KL
 }
 
-// ✅ Coordinates → Zone detection
+// ✅ Coordinates → Zone detection endpoint
 router.get('/coordinates/:lat/:lng', async (req, res) => {
   try {
     const { lat, lng } = req.params;
@@ -72,7 +72,7 @@ router.get('/coordinates/:lat/:lng', async (req, res) => {
   }
 });
 
-// ✅ Fetch from JAKIM (with full safety)
+// ✅ Primary JAKIM fetch (robust / safe)
 async function fetchJAKIM(zoneCode) {
   const today = new Date();
   const d = today.toISOString().split("T")[0];
@@ -85,8 +85,8 @@ async function fetchJAKIM(zoneCode) {
 
   try {
     const response = await axios.get(url, {
-      timeout: 8000,
-      validateStatus: () => true, // ✅ VERY IMPORTANT
+      timeout: 9000,
+      validateStatus: () => true, // ✅ Required so axios doesn't throw silently
       headers: {
         "User-Agent": "Mozilla/5.0 (MuslimDiary/RenderServer)",
         "Accept": "application/json"
@@ -95,7 +95,6 @@ async function fetchJAKIM(zoneCode) {
 
     console.log(`📦 Raw JAKIM response for ${zoneCode}:`, response.data);
 
-    // ✅ Validate data structure
     if (
       !response.data ||
       typeof response.data !== "object" ||
@@ -123,7 +122,7 @@ async function fetchJAKIM(zoneCode) {
   }
 }
 
-// ✅ DB fallback: today → yesterday
+// ✅ DB fallback logic
 async function loadDBFallback(zoneCode) {
   const today = new Date().toISOString().split("T")[0];
   const yesterday = new Date(Date.now() - 86400000)
@@ -158,12 +157,33 @@ async function saveToDB(zoneCode, data) {
   console.log(`💾 Saved JAKIM data for ${zoneCode} to DB`);
 }
 
+// ✅ ✅ ✅ DEBUG: Force fetch & save JAKIM → DB
+router.get('/debug/save/:zone', async (req, res) => {
+  const zone = req.params.zone;
+
+  try {
+    console.log(`🛠 Debug: Force save for ${zone}`);
+    const live = await fetchJAKIM(zone);
+    await saveToDB(zone, live);
+
+    return res.json({
+      success: true,
+      message: `✅ Saved JAKIM for ${zone}`,
+      data: live
+    });
+
+  } catch (error) {
+    console.error("💥 Debug save error:", error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ✅ Main prayer times endpoint
 router.get('/:zoneCode', async (req, res) => {
   const { zoneCode } = req.params;
 
   try {
-    // ✅ RAM Cache
+    // ✅ RAM cache first
     const ram = prayerCache.get(zoneCode);
     if (ram) {
       return res.json({ success: true, data: ram, source: ram.source });
@@ -171,7 +191,7 @@ router.get('/:zoneCode', async (req, res) => {
 
     let result;
 
-    // ✅ 1. Try JAKIM first
+    // ✅ 1. Try JAKIM
     try {
       result = await fetchJAKIM(zoneCode);
       await saveToDB(zoneCode, result);
@@ -179,14 +199,14 @@ router.get('/:zoneCode', async (req, res) => {
     } catch (jakimError) {
       console.warn(`⚠️ JAKIM failed for ${zoneCode}, using DB fallback`);
 
-      // ✅ 2. Use database fallback
+      // ✅ 2. DB fallback
       const db = await loadDBFallback(zoneCode);
       if (db) {
         prayerCache.set(zoneCode, db);
         return res.json({ success: true, data: db, source: db.source });
       }
 
-      // ✅ 3. No DB data → hard fail
+      // ✅ 3. No fallback available
       return res.status(503).json({
         success: false,
         error: "No JAKIM data available (live or cached).",
@@ -194,7 +214,6 @@ router.get('/:zoneCode', async (req, res) => {
       });
     }
 
-    // ✅ Success
     return res.json({ success: true, data: result, source: result.source });
 
   } catch (error) {
@@ -208,5 +227,3 @@ router.get('/:zoneCode', async (req, res) => {
 });
 
 module.exports = router;
-
-//test
