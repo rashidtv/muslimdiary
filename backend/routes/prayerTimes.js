@@ -2,226 +2,218 @@ const express = require('express');
 const axios = require('axios');
 const NodeCache = require('node-cache');
 const PrayerCache = require('../models/PrayerCache');
+const detectJakimZone = require('../utils/zoneDetector');
 
 const router = express.Router();
 
-// In-memory cache (1 hour)
+// 1-hour RAM cache
 const prayerCache = new NodeCache({ stdTTL: 3600 });
 
-// ✅ Malaysia JAKIM Zones Mapping
-const MALAYSIA_ZONES = {
-  "Kuala Lumpur": "WLY01",
-  "Putrajaya": "WLY01",
-  "Selangor": "WLY02",
-  "Johor": "JHR01",
-  "Kedah": "KDH01",
-  "Kelantan": "KTN01",
-  "Melaka": "MLK01",
-  "Negeri Sembilan": "NGS01",
-  "Pahang": "PHG01",
-  "Perak": "PRK01",
-  "Perlis": "PLS01",
-  "Pulau Pinang": "PNG01",
-  "Penang": "PNG01",
-  "Sabah": "SBH01",
-  "Sarawak": "SWK01",
-  "Terengganu": "TRG01",
-  "Labuan": "LBN01"
-};
 
-// ✅ Detect proper zone from reverse geocode
-function detectZone(address) {
-  const state = address.state || address.city || address.region;
-  if (!state) return "WLY01";
-
-  for (const key of Object.keys(MALAYSIA_ZONES)) {
-    if (state.includes(key)) return MALAYSIA_ZONES[key];
-  }
-
-  return "WLY01"; // Default KL
-}
-
-// ✅ Coordinates → Zone detection endpoint
-router.get('/coordinates/:lat/:lng', async (req, res) => {
-  try {
-    const { lat, lng } = req.params;
-
-    console.log(`📍 Reverse geocoding for: ${lat}, ${lng}`);
-
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
-      { headers: { "User-Agent": "MuslimDiary/3.0" } }
-    );
-
-    const data = response.data;
-    const zone = detectZone(data.address || {});
-    const locationName = data.display_name || `Zone ${zone}`;
-
-    return res.json({
-      success: true,
-      data: { zone, locationName }
-    });
-
-  } catch (error) {
-    console.error("❌ Coordinate lookup failed:", error.message);
-
-    return res.json({
-      success: false,
-      data: { zone: "WLY01", locationName: "Kuala Lumpur (Fallback)" }
-    });
-  }
-});
-
-// ✅ Primary JAKIM fetch (robust / safe)
+// ============================================
+//  Fetch JAKIM timetable (Robust version)
+// ============================================
 async function fetchJAKIM(zoneCode) {
   const today = new Date();
-  const d = today.toISOString().split("T")[0];
+  const date = today.toISOString().split("T")[0];
 
   const url =
     `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat` +
-    `&period=date&zone=${zoneCode}&date=${d}`;
+    `&period=date&zone=${zoneCode}&date=${date}`;
 
-  console.log(`🌙 Fetching JAKIM times for ${zoneCode}`);
+  console.log(`🌙 Fetching JAKIM for ${zoneCode}`);
 
   try {
-    const response = await axios.get(url, {
-      timeout: 9000,
-      validateStatus: () => true, // ✅ Required so axios doesn't throw silently
+    const res = await axios.get(url, {
+      timeout: 12000,
+      validateStatus: () => true, 
       headers: {
         "User-Agent": "Mozilla/5.0 (MuslimDiary/RenderServer)",
         "Accept": "application/json"
       }
     });
 
-    console.log(`📦 Raw JAKIM response for ${zoneCode}:`, response.data);
+    console.log(`📦 Raw JAKIM response for ${zoneCode}:`, res.data);
 
+    // Validate structure
     if (
-      !response.data ||
-      typeof response.data !== "object" ||
-      !Array.isArray(response.data.prayerTime) ||
-      response.data.prayerTime.length === 0
+      !res.data ||
+      typeof res.data !== "object" ||
+      !Array.isArray(res.data.prayerTime) ||
+      res.data.prayerTime.length === 0
     ) {
-      throw new Error("JAKIM returned invalid or empty data");
+      throw new Error("Invalid JAKIM structure");
     }
 
-    const pt = response.data.prayerTime[0];
+    const p = res.data.prayerTime[0];
 
     return {
-      fajr: pt.fajr,
-      dhuhr: pt.dhuhr,
-      asr: pt.asr,
-      maghrib: pt.maghrib,
-      isha: pt.isha,
-      date: d,
+      fajr: p.fajr,
+      dhuhr: p.dhuhr,
+      asr: p.asr,
+      maghrib: p.maghrib,
+      isha: p.isha,
+      date,
+      zone: zoneCode,
       source: "jakim"
     };
-
   } catch (error) {
-    console.error(`💥 JAKIM API failure for ${zoneCode}:`, error.message);
+    console.error(`💥 JAKIM failed for ${zoneCode}:`, error.message);
     throw new Error("JAKIM-Failed");
   }
 }
 
-// ✅ DB fallback logic
-async function loadDBFallback(zoneCode) {
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000)
-    .toISOString().split("T")[0];
 
-  console.log(`📚 Loading DB fallback for ${zoneCode}`);
+// ============================================
+//   DB fallback logic (today → yesterday → 5 days back)
+// ============================================
+async function loadDBFallback(zone) {
+  const today = new Date();
 
-  let record = await PrayerCache.findOne({ zone: zoneCode, date: today });
-  if (record) {
-    console.log("✅ Using today's DB cache");
-    return { ...record.toObject(), source: "db-today" };
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today - i * 86400000).toISOString().split("T")[0];
+    const doc = await PrayerCache.findOne({ zone, date: d });
+
+    if (doc) {
+      console.log(`✅ DB fallback using ${d} for ${zone}`);
+      return { ...doc.toObject(), source: "db-fallback" };
+    }
   }
 
-  record = await PrayerCache.findOne({ zone: zoneCode, date: yesterday });
-  if (record) {
-    console.log("✅ Using yesterday's DB cache");
-    return { ...record.toObject(), source: "db-yesterday" };
-  }
-
-  console.log("❌ No DB fallback found");
+  console.log("❌ No DB fallback available for", zone);
   return null;
 }
 
-// ✅ Save to DB
-async function saveToDB(zoneCode, data) {
+
+// ============================================
+//   Save to DB
+// ============================================
+async function saveToDB(zone, data) {
   await PrayerCache.findOneAndUpdate(
-    { zone: zoneCode, date: data.date },
+    { zone, date: data.date },
     data,
     { upsert: true, new: true }
   );
 
-  console.log(`💾 Saved JAKIM data for ${zoneCode} to DB`);
+  console.log(`💾 Saved ${zone} ${data.date} to DB`);
 }
 
-// ✅ ✅ ✅ DEBUG: Force fetch & save JAKIM → DB
+
+
+// ============================================
+//   DEBUG ENDPOINT — Force-Save JAKIM to DB
+// ============================================
 router.get('/debug/save/:zone', async (req, res) => {
   const zone = req.params.zone;
 
   try {
-    console.log(`🛠 Debug: Force save for ${zone}`);
-    const live = await fetchJAKIM(zone);
-    await saveToDB(zone, live);
+    const data = await fetchJAKIM(zone);
+    await saveToDB(zone, data);
 
-    return res.json({
+    res.json({
       success: true,
-      message: `✅ Saved JAKIM for ${zone}`,
-      data: live
+      message: `✅ Saved fresh JAKIM for ${zone}`,
+      data
     });
-
-  } catch (error) {
-    console.error("💥 Debug save error:", error.message);
-    return res.status(500).json({ success: false, error: error.message });
+  } catch (e) {
+    res.status(500).json({
+      success: false,
+      error: e.message
+    });
   }
 });
 
-// ✅ Main prayer times endpoint
-router.get('/:zoneCode', async (req, res) => {
-  const { zoneCode } = req.params;
+
+
+// ============================================
+//  Coordinates → Zone (Official)
+// ============================================
+router.get('/coordinates/:lat/:lng', async (req, res) => {
+  const { lat, lng } = req.params;
 
   try {
-    // ✅ RAM cache first
-    const ram = prayerCache.get(zoneCode);
-    if (ram) {
-      return res.json({ success: true, data: ram, source: ram.source });
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      { headers: { "User-Agent": "MuslimDiary/3.0" } }
+    );
+
+    const addr = response.data.address;
+    const zone = detectJakimZone(addr);
+
+    res.json({
+      success: true,
+      data: {
+        zone,
+        locationName: response.data.display_name
+      }
+    });
+
+  } catch (error) {
+    console.error("Reverse geocode failed:", error.message);
+
+    res.json({
+      success: false,
+      data: {
+        zone: "WLY01",
+        locationName: "Kuala Lumpur (fallback)"
+      }
+    });
+  }
+});
+
+
+
+// ============================================
+//  Main endpoint: /api/prayertimes/:zone
+// ============================================
+router.get('/:zone', async (req, res) => {
+  const zone = req.params.zone;
+
+  try {
+    // 1) RAM Cache
+    const cached = prayerCache.get(zone);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached,
+        source: cached.source
+      });
     }
 
     let result;
 
-    // ✅ 1. Try JAKIM
+    // 2) Try JAKIM
     try {
-      result = await fetchJAKIM(zoneCode);
-      await saveToDB(zoneCode, result);
-      prayerCache.set(zoneCode, result);
-    } catch (jakimError) {
-      console.warn(`⚠️ JAKIM failed for ${zoneCode}, using DB fallback`);
+      result = await fetchJAKIM(zone);
+      await saveToDB(zone, result);
+      prayerCache.set(zone, result);
+    } catch (err) {
+      console.log(`⚠️ JAKIM failed for ${zone}, using DB fallback`);
+      result = await loadDBFallback(zone);
 
-      // ✅ 2. DB fallback
-      const db = await loadDBFallback(zoneCode);
-      if (db) {
-        prayerCache.set(zoneCode, db);
-        return res.json({ success: true, data: db, source: db.source });
+      if (!result) {
+        return res.status(503).json({
+          success: false,
+          error: "No JAKIM data available (live or cached).",
+          source: "no-fallback"
+        });
       }
 
-      // ✅ 3. No fallback available
-      return res.status(503).json({
-        success: false,
-        error: "No JAKIM data available (live or cached).",
-        source: "fallback-failed"
-      });
+      prayerCache.set(zone, result);
     }
 
-    return res.json({ success: true, data: result, source: result.source });
+    return res.json({
+      success: true,
+      data: result,
+      source: result.source
+    });
 
   } catch (error) {
     console.error("💥 PrayerTimes route error:", error);
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      error: error.message || "Internal server error"
+      error: error.message
     });
   }
 });
