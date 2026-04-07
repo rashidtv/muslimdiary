@@ -1,9 +1,12 @@
 // =====================================
 // OFFICIAL JAKIM ZONE TABLE (FULL MALAYSIA)
-// Syntax-verified ✅
+// With expanded Selangor mapping for Hulu Langat & Kajang
 // =====================================
 
 module.exports = {
+  // ============================
+  //  W.P KUALA LUMPUR + PUTRAJAYA
+  // ============================
   WILAYAH: {
     WLY01: [
       "Kuala Lumpur",
@@ -11,21 +14,58 @@ module.exports = {
     ]
   },
 
+  // ============================
+  //  SELANGOR (SGR01–SGR03)
+  // ============================
   SELANGOR: {
     SGR01: [
-      "Gombak", "Petaling", "Sepang",
-      "Hulu Langat", "Hulu Selangor", "Shah Alam"
+      // ✅ Gombak / Petaling / Sepang / Hulu Langat / Hulu Selangor
+      "Gombak",
+      "Petaling",
+      "Sepang",
+      "Hulu Langat",
+      "Hulu langat",
+      "Daerah Hulu Langat",
+      "Hulu Langat District",
+      "Hulu Selangor",
+      "Shah Alam",
+
+      // ✅ Kajang / Bangi / Semenyih / Cheras (Selangor)
+      "Kajang",
+      "Bandar Baru Bangi",
+      "Bangi",
+      "Semenyih",
+      "Cheras",
+      "Balakong",
+
+      // ✅ Areas under Majlis Perbandaran Kajang (MPKj)
+      "Majlis Perbandaran Kajang",
+      "MPKj",
+
+      // ✅ Common residential areas
+      "Setia Alamsari",
+      "Bukit Mahkota",
+      "Bandar Putra Mahkota",
+      "Bandar Seri Putra",
+      "Taman Impian Ehsan",
+      "Taman Bukit Mewah",
+      "Taman Bukit Indah",
     ],
+
     SGR02: [
       "Kuala Selangor",
       "Sabak Bernam"
     ],
+
     SGR03: [
       "Klang",
       "Kuala Langat"
     ]
   },
 
+  // ============================
+  //  JOHOR (JHR01–JHR04)
+  // ============================
   JOHOR: {
     JHR01: ["Pulau Aur", "Pulau Pemanggil"],
     JHR02: ["Johor Bahru", "Kota Tinggi", "Mersing", "Kulai"],
@@ -33,6 +73,9 @@ module.exports = {
     JHR04: ["Batu Pahat", "Muar", "Segamat", "Gemas", "Tangkak"]
   },
 
+  // ============================
+  //  KEDAH (KDH01–KDH07)
+  // ============================
   KEDAH: {
     KDH01: ["Kota Setar", "Kubang Pasu", "Pokok Sena"],
     KDH02: ["Kuala Muda", "Yan", "Pendang"],
@@ -43,6 +86,9 @@ module.exports = {
     KDH07: ["Gunung Jerai"]
   },
 
+  // ============================
+  //  KELANTAN (KTN01–KTN02)
+  // ============================
   KELANTAN: {
     KTN01: [
       "Bachok", "Kota Bharu", "Machang", "Pasir Mas",
@@ -50,21 +96,29 @@ module.exports = {
       "Kuala Krai", "Mukim Chiku"
     ],
     KTN02: [
-      "Gua Musang (Galas)", "Gua Musang (Bertam)",
-      "Jeli", "Lojing"
+      "Gua Musang (Galas)", "Gua Musang (Bertam)", "Jeli", "Lojing"
     ]
   },
 
+  // ============================
+  //  MELAKA (MLK01)
+  // ============================
   MELAKA: {
     MLK01: ["Seluruh Negeri Melaka"]
   },
 
+  // ============================
+  //  NEGERI SEMBILAN (NGS01–NGS03)
+  // ============================
   NEGERI_SEMBILAN: {
     NGS01: ["Tampin", "Jempol"],
     NGS02: ["Jelebu", "Kuala Pilah", "Rembau"],
     NGS03: ["Port Dickson", "Seremban"]
   },
 
+  // ============================
+  //  PAHANG (PHG01–PHG07)
+  // ============================
   PAHANG: {
     PHG01: ["Pulau Tioman"],
     PHG02: ["Kuantan", "Pekan", "Muadzam Shah"],
@@ -75,14 +129,23 @@ module.exports = {
     PHG07: ["Rompin", "Endau", "Pontian (Pahang)"]
   },
 
+  // ============================
+  //  PERLIS (PLS01)
+  // ============================
   PERLIS: {
     PLS01: ["Kangar", "Padang Besar", "Arau"]
   },
 
+  // ============================
+  //  PENANG (PNG01)
+  // ============================
   PULAU_PINANG: {
     PNG01: ["Seluruh Negeri Pulau Pinang"]
   },
 
+  // ============================
+  //  PERAK (PRK01–PRK07)
+  // ============================
   PERAK: {
     PRK01: ["Tapah", "Slim River", "Tanjung Malim"],
     PRK02: ["Kuala Kangsar", "Sg Siput", "Ipoh", "Batu Gajah", "Kampar"],
@@ -97,6 +160,9 @@ module.exports = {
     PRK07: ["Bukit Larut"]
   },
 
+  // ============================
+  //  SABAH (SBH01–SBH09)
+  // ============================
   SABAH: {
     SBH01: ["Sandakan Timur", "Bukit Garam", "Semawang", "Temanggong", "Tambisan", "Sukau"],
     SBH02: ["Beluran", "Telupid", "Pinangah", "Terusan", "Kuamut"],
@@ -109,6 +175,9 @@ module.exports = {
     SBH09: ["Beaufort", "Kuala Penyu", "Sipitang", "Tenom", "Long Pasia", "Membakut", "Weston"]
   },
 
+  // ============================
+  //  SARAWAK (SWK01–SWK09)
+  // ============================
   SARAWAK: {
     SWK01: ["Limbang", "Lawas", "Sundar", "Trusan"],
     SWK02: ["Miri", "Niah", "Bekenu", "Sibuti", "Marudi"],
@@ -121,6 +190,9 @@ module.exports = {
     SWK09: ["Kampung Patarikan"]
   },
 
+  // ============================
+  //  TERENGGANU (TRG01–TRG02)
+  // ============================
   TERENGGANU: {
     TRG01: ["Kuala Terengganu", "Marang", "Kuala Nerus"],
     TRG02: ["Besut", "Setiu", "Dungun", "Kemaman", "Hulu Terengganu"]
