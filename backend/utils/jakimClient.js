@@ -1,24 +1,40 @@
-// backend/utils/jakimClient.js
+// =======================================================
+// ✅ jakimClient.js
+//    Fetch daily or monthly prayer times from JAKIM
+//    Clean, safe, syntax-correct version
+// =======================================================
+
 const axios = require("axios");
 
-=${today}`;async function fetchDaily(zone) {
+// -------------------------------------------------------
+// ✅ Fetch DAILY prayer times from JAKIM
+// -------------------------------------------------------
+async function fetchDaily(zone) {
+  const today = new Date().toISOString().split("T")[0];
+
+  const url =
+    `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat` +
+    `&period=date&zone=${zone}&date=${today}`;
+
+  console.log(`🌙 JAKIM daily fetch for ${zone}`);
 
   try {
     const res = await axios.get(url, {
-      timeout: 12000,
+      timeout: 15000,
       validateStatus: () => true,
       headers: {
         "User-Agent": "Mozilla/5.0 (MuslimDiaryCron/1.0)",
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     });
 
     if (
       !res.data ||
+      typeof res.data !== "object" ||
       !Array.isArray(res.data.prayerTime) ||
       res.data.prayerTime.length === 0
     ) {
-      throw new Error("Invalid JAKIM format");
+      throw new Error("Invalid JAKIM response");
     }
 
     const p = res.data.prayerTime[0];
@@ -34,32 +50,37 @@ const axios = require("axios");
       source: "jakim-live",
     };
   } catch (err) {
-    console.error(`❌ JAKIM daily fetch failed for ${zone}:`, err.message);
+    console.error(`❌ JAKIM daily fetch FAILED for ${zone}:`, err.message);
     throw err;
   }
 }
 
+// -------------------------------------------------------
+// ✅ Fetch MONTHLY prayer times from JAKIM
+// -------------------------------------------------------
 async function fetchMonthly(zone) {
-  const today = new Date();
-  const month = today.getMonth() + 1;
-  const year = today.getFullYear();
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
 
   const url =
     `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat` +
     `&period=month&zone=${zone}&month=${month}&year=${year}`;
 
+  console.log(`📅 JAKIM monthly fetch for ${zone}`);
+
   try {
     const res = await axios.get(url, {
-      timeout: 15000,
+      timeout: 20000,
       validateStatus: () => true,
       headers: {
         "User-Agent": "Mozilla/5.0 (MuslimDiaryCron/1.0)",
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     });
 
     if (!res.data || !Array.isArray(res.data.prayerTime)) {
-      throw new Error("Invalid JAKIM monthly structure");
+      throw new Error("Invalid JAKIM monthly format");
     }
 
     return res.data.prayerTime.map((p) => ({
@@ -73,13 +94,10 @@ async function fetchMonthly(zone) {
       source: "jakim-monthly",
     }));
   } catch (err) {
-    console.error(`❌ JAKIM monthly fetch FAILED for ${zone}`, err.message);
+    console.error(`❌ JAKIM monthly fetch FAILED for ${zone}:`, err.message);
     throw err;
   }
 }
 
 module.exports = { fetchDaily, fetchMonthly };
-  const today = new Date().toISOString().split("T")[0];
-
-  const url =
-    `https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat` +
+``
