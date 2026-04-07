@@ -11,8 +11,10 @@ const API_CONFIG = {
 };
 
 const getApiConfig = () => {
-  const isDevelopment = window.location.hostname === 'localhost' || 
-                        window.location.hostname === '127.0.0.1';
+  const isDevelopment =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
   return isDevelopment ? API_CONFIG.development : API_CONFIG.production;
 };
 
@@ -32,38 +34,64 @@ const makeApiRequest = async (url, options = {}, retryCount = 0) => {
     return await response.json();
   } catch (error) {
     // Retry on timeout or network errors
-    if ((error.name === 'TimeoutError' || error.message.includes('Failed to fetch')) && retryCount < 2) {
+    if (
+      (error.name === 'TimeoutError' ||
+        error.message.includes('Failed to fetch')) &&
+      retryCount < 2
+    ) {
       console.log(`🔄 API request failed, retry ${retryCount + 1}/3...`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+      await new Promise(resolve =>
+        setTimeout(resolve, 1000 * (retryCount + 1))
+      );
       return makeApiRequest(url, options, retryCount + 1);
     }
     throw error;
   }
 };
 
-// This function should NOT block the prayer times display
-export const getLocationName = async (latitude, longitude) => {
-  const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://muslimdiarybackend.onrender.com';
+/**
+ * ✅ FIXED: Added zoneCode parameter to avoid undefined variable errors
+ * Used safe fallback to prevent React ESLint build failure.
+ */
+export const getLocationName = async (
+  latitude,
+  longitude,
+  zoneCode = 'Unknown'
+) => {
+  const API_BASE =
+    process.env.REACT_APP_API_BASE_URL ||
+    'https://muslimdiarybackend.onrender.com';
+
   try {
-    const response = await fetch(`${API_BASE}/api/nominatim-proxy?lat=${latitude}&lon=${longitude}`);
+    const response = await fetch(
+      `${API_BASE}/api/nominatim-proxy?lat=${latitude}&lon=${longitude}`
+    );
+
     if (!response.ok) throw new Error('Proxy request failed');
+
     const data = await response.json();
-    return data.display_name || `Zone ${zoneCode}`; // Return the human-readable name
+    return data.display_name || `Zone ${zoneCode}`;
   } catch (error) {
-    console.warn('Location name fetch failed, using zone as fallback:', error);
-    return `Zone ${zoneCode}`; // Graceful fallback
+    console.warn(
+      'Location name fetch failed, using zone as fallback:',
+      error.message
+    );
+    return `Zone ${zoneCode}`;
   }
 };
 
-// Main prayer times calculation function
+// Main prayer times function
 export const calculatePrayerTimes = async (latitude, longitude) => {
   try {
-    console.log(`📍 Getting prayer times for coordinates: ${latitude}, ${longitude}`);
-    
-    const apiConfig = getApiConfig();
-    let zoneCode, locationName;
+    console.log(
+      `📍 Getting prayer times for coordinates: ${latitude}, ${longitude}`
+    );
 
-    // Step 1: Get zone from coordinates
+    const apiConfig = getApiConfig();
+    let zoneCode = null,
+      locationName = null;
+
+    // Step 1: Detect zone from coordinates
     try {
       const zoneData = await makeApiRequest(
         `${apiConfig.baseURL}/api/prayertimes/coordinates/${latitude}/${longitude}`
@@ -72,32 +100,37 @@ export const calculatePrayerTimes = async (latitude, longitude) => {
       if (zoneData.success && zoneData.data) {
         zoneCode = zoneData.data.zone;
         locationName = zoneData.data.locationName;
+
         console.log(`📍 Coordinates → Zone: ${zoneCode} - ${locationName}`);
-        
-        // Store for future fallback
+
         localStorage.setItem('lastKnownZone', zoneCode);
       }
     } catch (zoneError) {
-      console.log('Zone detection failed, using fallback:', zoneError.message);
+      console.log('Zone detection failed:', zoneError.message);
     }
 
-    // Step 2: Fallback zone detection
+    // Step 2: Fallback zone
     if (!zoneCode) {
       zoneCode = await getFallbackZone(latitude, longitude);
       locationName = `Zone ${zoneCode}`;
       console.log(`📍 Using fallback zone: ${zoneCode}`);
     }
 
-    // Step 3: Get prayer times for the zone
+    // Step 3: Fetch prayer times for the zone
     const prayerData = await makeApiRequest(
       `${apiConfig.baseURL}/api/prayertimes/${zoneCode}`
     );
-    
+
     if (prayerData.success && prayerData.data) {
       const times = prayerData.data;
-      
-      // Validate required prayer times
-      if (!times.fajr || !times.dhuhr || !times.asr || !times.maghrib || !times.isha) {
+
+      if (
+        !times.fajr ||
+        !times.dhuhr ||
+        !times.asr ||
+        !times.maghrib ||
+        !times.isha
+      ) {
         throw new Error('Incomplete prayer times data received');
       }
 
@@ -118,7 +151,7 @@ export const calculatePrayerTimes = async (latitude, longitude) => {
         locationName: times.locationName || locationName
       };
 
-      console.log('✅ Prayer times fetched successfully:', {
+      console.log('✅ Prayer times fetched:', {
         zone: result.zone,
         location: result.locationName,
         source: result.source
@@ -126,27 +159,23 @@ export const calculatePrayerTimes = async (latitude, longitude) => {
 
       return result;
     } else {
-      throw new Error(prayerData.error || 'Failed to fetch prayer times');
+      throw new Error(prayerData.error || 'Prayer time fetch failed');
     }
-
   } catch (error) {
     console.error('❌ Prayer times calculation failed:', error.message);
-    
-    // Final fallback with static times
     return await getFinalFallback(latitude, longitude);
   }
 };
 
-// Get fallback zone with multiple strategies
+// Fallback zone detection
 const getFallbackZone = async (latitude, longitude) => {
-  // Strategy 1: Last known zone from localStorage
   const lastZone = localStorage.getItem('lastKnownZone');
+
   if (lastZone) {
     console.log(`📍 Using last known zone: ${lastZone}`);
     return lastZone;
   }
 
-  // Strategy 2: Try backend coordinate lookup
   try {
     const apiConfig = getApiConfig();
     const response = await makeApiRequest(
@@ -159,21 +188,19 @@ const getFallbackZone = async (latitude, longitude) => {
       return zone;
     }
   } catch (error) {
-    console.log('Backend zone detection failed:', error.message);
+    console.log('Backend zone fallback failed:', error.message);
   }
 
-  // Strategy 3: Default to Kuala Lumpur
-  console.log('📍 Using default zone: WLY01');
+  console.log('📍 Defaulting to WLY01');
   return 'WLY01';
 };
 
-// Final fallback with static prayer times
+// Final fallback (static times)
 const getFinalFallback = async (latitude, longitude) => {
   try {
     const zoneCode = await getFallbackZone(latitude, longitude);
-    
-    // Try one more time with the zone
     const apiConfig = getApiConfig();
+
     const response = await makeApiRequest(
       `${apiConfig.baseURL}/api/prayertimes/${zoneCode}`
     );
@@ -198,11 +225,10 @@ const getFinalFallback = async (latitude, longitude) => {
       };
     }
   } catch (error) {
-    console.error('Final fallback failed:', error.message);
+    console.error('Final fallback error:', error.message);
   }
 
-  // Absolute last resort: Static times for WLY01
-  console.log('⚠️ Using static fallback times for WLY01');
+  console.log('⚠️ Using static fallback for WLY01');
   return {
     fajr: '5:49 AM',
     sunrise: '7:09 AM',
@@ -221,117 +247,92 @@ const getFinalFallback = async (latitude, longitude) => {
   };
 };
 
-// Estimate sunrise based on Fajr time (JAKIM method)
-const calculateSunriseTime = (fajrTime) => {
-  if (!fajrTime || typeof fajrTime !== 'string') {
-    return '7:00 AM';
-  }
-  
+// Sunrise calculation
+const calculateSunriseTime = fajrTime => {
+  if (!fajrTime) return '7:00 AM';
+
   try {
     const [hours, minutes] = fajrTime.split(':');
     let hour = parseInt(hours);
     let minute = parseInt(minutes);
-    
-    if (isNaN(hour) || isNaN(minute)) {
-      return '7:00 AM';
-    }
-    
-    // JAKIM sunrise is typically about 1 hour 20 minutes after Fajr
+
     minute += 80;
     if (minute >= 60) {
       hour += 1;
       minute -= 60;
     }
-    
+
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
+
     return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-  } catch (error) {
+  } catch {
     return '7:00 AM';
   }
 };
 
-// Format JAKIM time string (HH:MM:SS) to display format (HH:MM AM/PM)
-const formatTimeFromString = (timeStr) => {
-  if (!timeStr || typeof timeStr !== 'string') {
-    return '12:00 PM';
-  }
-  
+const formatTimeFromString = timeStr => {
+  if (!timeStr) return '12:00 PM';
+
   try {
-    // Handle JAKIM format: "05:49:00"
     const [hours, minutes] = timeStr.split(':');
     const hour = parseInt(hours);
-    const minute = minutes ? parseInt(minutes) : 0;
-    
-    if (isNaN(hour) || isNaN(minute)) {
-      return '12:00 PM';
-    }
-    
+    const minute = parseInt(minutes);
+
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
+
     return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-  } catch (error) {
+  } catch {
     return '12:00 PM';
   }
 };
 
-// Location service with enhanced error handling
+// Get user device location
 export const getCurrentLocation = () => {
-  return new Promise((resolve, reject) => { 
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by this browser'));
+      reject(new Error('Geolocation not supported'));
       return;
     }
 
-    console.log('📍 Requesting current location...');
-    
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location = {
+      position => {
+        resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy,
           timestamp: position.timestamp
-        };
-        
-        console.log('📍 Location obtained:', location);
-        resolve(location);
+        });
       },
-      (error) => {
-        console.error('📍 Location error:', error);
-        
-        let errorMessage = 'Unable to retrieve your location';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
-            break;
-        }
-        
-        reject(new Error(errorMessage));
+      error => {
+        reject(
+          new Error(
+            {
+              1: 'Location permission denied',
+              2: 'Location unavailable',
+              3: 'Location timeout'
+            }[error.code] || 'Failed to get location'
+          )
+        );
       },
       {
         enableHighAccuracy: true,
         timeout: 15000,
-        maximumAge: 600000 // 10 minutes
+        maximumAge: 600000
       }
     );
   });
 };
 
-// Store last known zone for future use
-export const storeLastKnownZone = (zoneCode) => {
-  if (zoneCode && typeof zoneCode === 'string') {
+// Save last zone
+export const storeLastKnownZone = zoneCode => {
+  if (zoneCode) {
     localStorage.setItem('lastKnownZone', zoneCode);
-    console.log(`💾 Stored last known zone: ${zoneCode}`);
+    console.log(`💾 Stored zone: ${zoneCode}`);
   }
 };
 
-// Export aliases for backward compatibility
+// Alias exports for backward compatibility
 export { calculatePrayerTimes as calculatePrayerTimesLocal };
 export { calculatePrayerTimes as calculatePrayerTimesAPI };
