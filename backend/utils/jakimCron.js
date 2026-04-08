@@ -25,7 +25,7 @@ async function syncZone(zone) {
 
 function startJakimCron() {
   // ✅ TEMPORARY: run every minute
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("0 14 * * *", async () => {
     console.log("⏳ Running JAKIM sync (every minute)");
 
     const allZones = [];
