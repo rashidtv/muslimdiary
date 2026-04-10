@@ -1,94 +1,64 @@
-// =====================================
-//  zoneDetector.js (Corrected & Robust)
-//  GPS → OSM → District → Official JAKIM Zone
-// =====================================
+const jakimZones = require("./jakimZones");
 
-const zones = require("./jakimZones");
+/**
+ * Normalize string for matching
+ */
+function norm(value) {
+  return (value || "")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+}
 
-// Normalize string
-const norm = (v) => (v ? v.toString().trim().toLowerCase() : "");
-
-// Extract possible district keywords from OSM
-function extractParts(address) {
+/**
+ * Extract all possible location names from OSM address
+ */
+function extractCandidates(address) {
   return [
     address.suburb,
     address.neighbourhood,
-    address.city_district,
+    address.village,
     address.city,
     address.town,
-    address.village,
-    address.state_district,
+    address.city_district,
     address.county,
-    address.region,
-    address.state
-  ].map(norm).filter(Boolean);
+    address.state_district,
+    address.state,
+  ]
+    .filter(Boolean)
+    .map(norm);
 }
 
-// State → zone group map
-const STATE_MAP = {
-  "selangor": "SELANGOR",
-  "wilayah persekutuan": "WILAYAH",
-  "kuala lumpur": "WILAYAH",
-  "putrajaya": "WILAYAH",
-  "johor": "JOHOR",
-  "kedah": "KEDAH",
-  "kelantan": "KELANTAN",
-  "melaka": "MELAKA",
-  "malacca": "MELAKA",
-  "negeri sembilan": "NEGERI_SEMBILAN",
-  "pahang": "PAHANG",
-  "perlis": "PERLIS",
-  "pulau pinang": "PULAU_PINANG",
-  "penang": "PULAU_PINANG",
-  "perak": "PERAK",
-  "sabah": "SABAH",
-  "sarawak": "SARAWAK",
-  "terengganu": "TERENGGANU"
-};
-
-// Detect zone
+/**
+ * Pure data-driven JAKIM zone detection
+ * NO hardcoded zones
+ */
 function detectJakimZone(address) {
-  if (!address) return "WLY01";
+  if (!address) return null;
 
-  const parts = extractParts(address);
-  const state = norm(address.state);
-  const groupKey = STATE_MAP[state];
+  const candidates = extractCandidates(address);
 
-  // ----------------------------------------
-  // ✅ PRIORITY 1: Match districts under state
-  // ----------------------------------------
-  if (groupKey && zones[groupKey]) {
-    for (const [zoneCode, districtList] of Object.entries(zones[groupKey])) {
+  // Iterate over ALL zones from data
+  for (const stateKey of Object.keys(jakimZones)) {
+    const zonesInState = jakimZones[stateKey];
+
+    for (const zoneCode of Object.keys(zonesInState)) {
+      const districtList = zonesInState[zoneCode];
+
       for (const district of districtList) {
-        const d = norm(district);
-        if (parts.some((p) => p.includes(d))) {
-          console.log(`✅ ZoneDetector: ${district} → ${zoneCode}`);
+        const districtNorm = norm(district);
+
+        // Match ANY geolocation candidate
+        if (candidates.some(c => c.includes(districtNorm))) {
           return zoneCode;
         }
       }
     }
   }
 
-  // ----------------------------------------
-  // ✅ PRIORITY 2: Global fallback match
-  // ----------------------------------------
-  for (const zoneGroup of Object.values(zones)) {
-    for (const [zoneCode, districtList] of Object.entries(zoneGroup)) {
-      for (const district of districtList) {
-        const d = norm(district);
-        if (parts.some((p) => p.includes(d))) {
-          console.log(`✅ Fallback match: ${district} → ${zoneCode}`);
-          return zoneCode;
-        }
-      }
-    }
-  }
-
-  // ----------------------------------------
-  // ✅ FINAL: Safe fallback
-  // ----------------------------------------
-  console.warn("⚠️ ZoneDetector: no match. Defaulting to WLY01.");
-  return "WLY01";
+  // No match found
+  return null;
 }
 
 module.exports = detectJakimZone;
