@@ -8,13 +8,9 @@ import {
   CircularProgress,
   Button,
   Grid,
-  Chip,
   IconButton
 } from '@mui/material';
-import {
-  MyLocation,
-  Refresh
-} from '@mui/icons-material';
+import { MyLocation, Refresh } from '@mui/icons-material';
 
 /* -----------------------------------------------------
    ✅ PrayerTimes Component (Redesigned UI)
@@ -37,7 +33,32 @@ const PrayerTimes = () => {
       : 'https://muslimdiarybackend.onrender.com';
 
   /* -----------------------------------------------------
-     ✅ Detect user zone (kept exactly as your original logic)
+     ✅ Address Cleaner (removes municipal councils only)
+     ----------------------------------------------------- */
+  const cleanLocationName = (raw) => {
+    if (!raw) return '';
+
+    const blacklist = [
+      'majlis perbandaran',
+      'majlis bandaraya',
+      'majlis daerah',
+      'perbandaran',
+      'bandaraya',
+      'daerah'
+    ];
+
+    const parts = raw.split(',').map((p) => p.trim());
+
+    const cleaned = parts.filter((p) => {
+      const low = p.toLowerCase();
+      return !blacklist.some((bad) => low.includes(bad));
+    });
+
+    return cleaned.join(', ');
+  };
+
+  /* -----------------------------------------------------
+     ✅ Detect user zone & location
      ----------------------------------------------------- */
   const getCurrentZone = async () => {
     try {
@@ -52,7 +73,10 @@ const PrayerTimes = () => {
           if (response.ok) {
             const data = await response.json();
             if (data.success)
-              return { zone: data.data.zone, locationName: data.data.locationName };
+              return {
+                zone: data.data.zone,
+                locationName: cleanLocationName(data.data.locationName)
+              };
           }
         }
       }
@@ -60,7 +84,7 @@ const PrayerTimes = () => {
       // Fallback: browser geolocation
       return new Promise((resolve) => {
         if (!navigator.geolocation) {
-          resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur / Putrajaya' });
+          resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur, Malaysia' });
           return;
         }
 
@@ -74,24 +98,27 @@ const PrayerTimes = () => {
               if (response.ok) {
                 const data = await response.json();
                 if (data.success)
-                  resolve({ zone: data.data.zone, locationName: data.data.locationName });
-                else resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur / Putrajaya' });
+                  resolve({
+                    zone: data.data.zone,
+                    locationName: cleanLocationName(data.data.locationName)
+                  });
+                else resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur' });
               }
             } catch (e) {
-              resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur / Putrajaya' });
+              resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur' });
             }
           },
-          () => resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur / Putrajaya' }),
+          () => resolve({ zone: 'WLY01', locationName: 'Kuala Lumpur' }),
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
         );
       });
     } catch (error) {
-      return { zone: 'WLY01', locationName: 'Kuala Lumpur / Putrajaya' };
+      return { zone: 'WLY01', locationName: 'Kuala Lumpur' };
     }
   };
 
   /* -----------------------------------------------------
-     ✅ MAIN EFFECT → Fetch prayer times once on mount
+     ✅ Load on mount
      ----------------------------------------------------- */
   useEffect(() => {
     if (initialLoadRef.current) {
@@ -113,7 +140,7 @@ const PrayerTimes = () => {
   }, [prayerTimes]);
 
   /* -----------------------------------------------------
-     ✅ Fetch prayer times from backend API
+     ✅ Fetch prayer times
      ----------------------------------------------------- */
   const fetchPrayerTimes = async () => {
     if (loading) return;
@@ -157,57 +184,44 @@ const PrayerTimes = () => {
   const formatName = (name) =>
     name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 
-  const getCurrentPrayer = () => {
+  const currentPrayer = (() => {
     if (!prayerTimes) return null;
-
     const now = new Date();
-    const minutesNow = now.getHours() * 60 + now.getMinutes();
-
-    const prayers = [
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const list = [
       { name: 'Fajr', time: prayerTimes.fajr },
       { name: 'Dhuhr', time: prayerTimes.dhuhr },
       { name: 'Asr', time: prayerTimes.asr },
       { name: 'Maghrib', time: prayerTimes.maghrib },
       { name: 'Isha', time: prayerTimes.isha }
     ];
-
-    for (let i = prayers.length - 1; i >= 0; i--) {
-      if (prayers[i].time) {
-        const [h, m] = prayers[i].time.split(':');
-        const tMin = parseInt(h) * 60 + parseInt(m);
-        if (minutesNow >= tMin) return prayers[i];
-      }
+    for (let i = list.length - 1; i >= 0; i--) {
+      const [h, m] = list[i].time.split(':');
+      if (nowMin >= parseInt(h) * 60 + parseInt(m)) return list[i];
     }
-    return prayers[prayers.length - 1];
-  };
+    return list[list.length - 1];
+  })();
 
-  const getNextPrayer = () => {
+  const nextPrayer = (() => {
     if (!prayerTimes) return null;
-
     const now = new Date();
-    const minutesNow = now.getHours() * 60 + now.getMinutes();
-
-    const prayers = [
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const list = [
       { name: 'Fajr', time: prayerTimes.fajr },
       { name: 'Dhuhr', time: prayerTimes.dhuhr },
       { name: 'Asr', time: prayerTimes.asr },
       { name: 'Maghrib', time: prayerTimes.maghrib },
       { name: 'Isha', time: prayerTimes.isha }
     ];
-
-    for (const p of prayers) {
+    for (const p of list) {
       const [h, m] = p.time.split(':');
-      const tMin = parseInt(h) * 60 + parseInt(m);
-      if (minutesNow < tMin) return p;
+      if (nowMin < parseInt(h) * 60 + parseInt(m)) return p;
     }
-    return prayers[0];
-  };
-
-  const currentPrayer = getCurrentPrayer();
-  const nextPrayer = getNextPrayer();
+    return list[0];
+  })();
 
   /* -----------------------------------------------------
-     ✅ Loading / Error states
+     ✅ Loading / Error
      ----------------------------------------------------- */
   if (loading)
     return (
@@ -244,6 +258,17 @@ const PrayerTimes = () => {
     );
 
   /* -----------------------------------------------------
+     ✅ PRAYER ICONS
+     ----------------------------------------------------- */
+  const prayerIcons = {
+    fajr: '🌙',
+    dhuhr: '☀️',
+    asr: '🕓',
+    maghrib: '🌇',
+    isha: '🌙'
+  };
+
+  /* -----------------------------------------------------
      ✅ Final Redesigned UI
      ----------------------------------------------------- */
   return (
@@ -258,19 +283,18 @@ const PrayerTimes = () => {
     >
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
 
-        {/* ✅ Location */}
-        <Box sx={{ mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            <MyLocation sx={{ fontSize: 14, mr: 0.5 }} />
-            {locationName}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            JAKIM Zone {zone}
-          </Typography>
-        </Box>
+        {/* ✅ Trimmed Location */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+          <MyLocation sx={{ fontSize: 14, mr: 0.5 }} />
+          {locationName}
+        </Typography>
 
-        {/* ✅ Gregorian + Hijri Dates */}
-        <Box sx={{ mb: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          JAKIM Zone {zone}
+        </Typography>
+
+        {/* ✅ Dates */}
+        <Box sx={{ my: 2 }}>
           <Typography variant="subtitle1" fontWeight={600}>
             {new Date().toLocaleDateString(undefined, {
               weekday: 'long',
@@ -292,15 +316,14 @@ const PrayerTimes = () => {
           <Box
             sx={{
               p: 2,
-              mb: 2,
               borderRadius: 2,
-              backgroundColor: 'rgba(13,148,136,0.08)'
+              backgroundColor: 'rgba(13,148,136,0.08)',
+              mb: 2
             }}
           >
             <Typography variant="caption" color="text.secondary">
               Next prayer
             </Typography>
-
             <Typography variant="h6" fontWeight={700}>
               {formatName(nextPrayer.name)} • {formatTime(nextPrayer.time)}
             </Typography>
@@ -308,55 +331,52 @@ const PrayerTimes = () => {
         )}
 
         {/* ✅ Imsak & Syuruk */}
-        {(prayerTimes.imsak || prayerTimes.syuruk) && (
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              mb: 2
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Imsak • {formatTime(prayerTimes.imsak)}
-            </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            mb: 2
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            Imsak • {formatTime(prayerTimes.imsak)}
+          </Typography>
 
-            <Typography variant="body2" color="text.secondary">
-              Syuruk • {formatTime(prayerTimes.syuruk)}
-            </Typography>
-          </Box>
-        )}
+          <Typography variant="body2" color="text.secondary">
+            Syuruk • {formatTime(prayerTimes.syuruk)}
+          </Typography>
+        </Box>
 
-        {/* ✅ Minimalist Prayer Grid */}
-        <Grid container spacing={1.5}>
+        {/* ✅ Sequential Prayer List */}
+        <Box>
           {['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].map((key) => {
             const isCurrent =
               currentPrayer &&
               currentPrayer.name.toLowerCase() === key;
 
             return (
-              <Grid item xs={6} key={key}>
-                <Box
-                  sx={{
-                    p: 2,
-                    textAlign: 'center',
-                    borderRadius: 2,
-                    backgroundColor: isCurrent
-                      ? 'rgba(124,58,237,0.08)'
-                      : 'transparent'
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    fontWeight={600}
-                  >
-                    {formatName(key)}
-                  </Typography>
+              <Box
+                key={key}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  mb: 1,
+                  borderRadius: 2,
+                  backgroundColor: isCurrent
+                    ? 'rgba(124,58,237,0.08)'
+                    : 'transparent'
+                }}
+              >
+                <Typography variant="body1">
+                  {prayerIcons[key]} {formatName(key)}
+                </Typography>
 
+                <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="h6" fontWeight={700}>
                     {formatTime(prayerTimes[key])}
                   </Typography>
-
                   {isCurrent && (
                     <Typography
                       variant="caption"
@@ -366,17 +386,19 @@ const PrayerTimes = () => {
                     </Typography>
                   )}
                 </Box>
-              </Grid>
+              </Box>
             );
           })}
-        </Grid>
+        </Box>
 
         {/* ✅ Footer */}
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Based on official JAKIM timetable
-          </Typography>
-        </Box>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 3, display: 'block' }}
+        >
+          Based on official JAKIM timetable
+        </Typography>
       </CardContent>
     </Card>
   );
