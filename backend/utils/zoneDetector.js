@@ -1,19 +1,12 @@
 const jakimZones = require("./jakimZones");
 
-/**
- * Normalize string for matching
- */
-function norm(value) {
-  return (value || "")
-    .toString()
+function norm(v) {
+  return (v || "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .trim();
 }
 
-/**
- * Extract all possible location names from OSM address
- */
 function extractCandidates(address) {
   return [
     address.suburb,
@@ -30,34 +23,36 @@ function extractCandidates(address) {
     .map(norm);
 }
 
-/**
- * Pure data-driven JAKIM zone detection
- * NO hardcoded zones
- */
 function detectJakimZone(address) {
   if (!address) return null;
 
   const candidates = extractCandidates(address);
 
-  // Iterate over ALL zones from data
+  // 1️⃣ Try exact district match (preferred)
   for (const stateKey of Object.keys(jakimZones)) {
-    const zonesInState = jakimZones[stateKey];
+    const zones = jakimZones[stateKey];
 
-    for (const zoneCode of Object.keys(zonesInState)) {
-      const districtList = zonesInState[zoneCode];
-
-      for (const district of districtList) {
-        const districtNorm = norm(district);
-
-        // Match ANY geolocation candidate
-        if (candidates.some(c => c.includes(districtNorm))) {
+    for (const zoneCode of Object.keys(zones)) {
+      for (const district of zones[zoneCode]) {
+        const d = norm(district);
+        if (candidates.some(c => c.includes(d))) {
           return zoneCode;
         }
       }
     }
   }
 
-  // No match found
+  // 2️⃣ Fallback: state-level default (data-driven)
+  const stateName = norm(address.state);
+
+  for (const stateKey of Object.keys(jakimZones)) {
+    if (norm(stateKey).includes(stateName)) {
+      const zones = jakimZones[stateKey];
+      return Object.keys(zones)[0]; // first zone defined for that state
+    }
+  }
+
+  // 3️⃣ Absolute last resort
   return null;
 }
 
