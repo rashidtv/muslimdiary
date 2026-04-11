@@ -1,13 +1,13 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext } from "react";
 
 const CompassContext = createContext();
 
 export const useCompass = () => {
-  const context = useContext(CompassContext);
-  if (!context) {
-    throw new Error("useCompass must be used within a CompassProvider");
+  const ctx = useContext(CompassContext);
+  if (!ctx) {
+    throw new Error("useCompass must be used within CompassProvider");
   }
-  return context;
+  return ctx;
 };
 
 export const CompassProvider = ({ children }) => {
@@ -17,61 +17,58 @@ export const CompassProvider = ({ children }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [compassError, setCompassError] = useState("");
 
-  /* ---------------------------------------------
-     ✅ QIBLA DIRECTION CALCULATION (ACCURATE)
-     --------------------------------------------- */
-  const calculateQiblaDirection = (lat, lng) => {
-    // Convert degrees to radians
-    const φ1 = lat * Math.PI / 180;
-    const φ2 = 21.4225 * Math.PI / 180;      // Kaaba latitude
-    const λ1 = lng * Math.PI / 180;
-    const λ2 = 39.8262 * Math.PI / 180;      // Kaaba longitude
+  /* --------------------------------------------------------
+     ✅ QIBLA DIRECTION (GLOBAL — works anywhere)
+     -------------------------------------------------------- */
+  const calculateQiblaBearing = (lat, lon) => {
+    const kaabaLat = 21.4225 * Math.PI / 180;
+    const kaabaLon = 39.8262 * Math.PI / 180;
 
-    const y = Math.sin(λ2 - λ1);
-    const x = Math.cos(φ1) * Math.tan(φ2) - Math.sin(φ1) * Math.cos(λ2 - λ1);
+    const φ1 = lat * Math.PI / 180;
+    const λ1 = lon * Math.PI / 180;
+
+    const y = Math.sin(kaabaLon - λ1);
+    const x =
+      Math.cos(φ1) * Math.tan(kaabaLat) -
+      Math.sin(φ1) * Math.cos(kaabaLon - λ1);
 
     let bearing = Math.atan2(y, x) * 180 / Math.PI;
-    return (bearing + 360) % 360; // Normalize 0–360°
+    return (bearing + 360) % 360;
   };
 
-  /* ------------------------------------------------------------
-     ✅ FIXED DEVICE HEADING FOR ALL DEVICES (iOS + Android)
-     ------------------------------------------------------------ */
+  /* --------------------------------------------------------
+     ✅ DEVICE HEADING NORMALIZATION (iOS + Android FIXED)
+     -------------------------------------------------------- */
   const handleCompass = (event) => {
-
     let heading = null;
 
-    // ✅ iOS Safari (webkitCompassHeading = TRUE heading)
+    // ✅ iOS gives TRUE compass heading
     if (typeof event.webkitCompassHeading !== "undefined") {
       heading = event.webkitCompassHeading;
     }
 
-    // ✅ Android Chrome uses alpha → but alpha=0 means device faces EAST
+    // ✅ Android alpha=0 = East → must convert to North-based
     else if (event.alpha != null) {
-      // Convert EAST-based alpha to TRUE NORTH heading:
-      // Formula: heading = (360 - alpha + 90) % 360
       heading = (360 - event.alpha + 90) % 360;
     }
 
-    // ✅ Only update if valid
     if (heading !== null && !isNaN(heading)) {
       setDeviceHeading(heading);
     }
   };
 
-  /* ------------------------------------------------------------
-     ✅ START COMPASS (Required user gesture for iOS)
-     ------------------------------------------------------------ */
+  /* --------------------------------------------------------
+     ✅ START COMPASS (iOS permissions included)
+     -------------------------------------------------------- */
   const startCompass = async () => {
     try {
       setCompassError("");
 
       if (!window.DeviceOrientationEvent) {
-        setCompassError("Compass not supported on this device");
+        setCompassError("Compass not supported");
         return;
       }
 
-      // ✅ iOS permission
       if (typeof DeviceOrientationEvent.requestPermission === "function") {
         const permission = await DeviceOrientationEvent.requestPermission();
         if (permission !== "granted") {
@@ -82,33 +79,33 @@ export const CompassProvider = ({ children }) => {
 
       window.addEventListener("deviceorientation", handleCompass, true);
       setCompassActive(true);
-
     } catch (err) {
       setCompassError("Failed to start compass");
     }
   };
 
-  /* ------------------------------------------------------------
-     ✅ STOP COMPASS
-     ------------------------------------------------------------ */
+  /* --------------------------------------------------------
+     ✅ STOP
+     -------------------------------------------------------- */
   const stopCompass = () => {
     window.removeEventListener("deviceorientation", handleCompass, true);
     setCompassActive(false);
   };
 
-  /* ------------------------------------------------------------
-     ✅ SET LOCATION + CALCULATE QIBLA
-     ------------------------------------------------------------ */
-  const setUserLocationAndCalculateQibla = (lat, lng) => {
-    setUserLocation({ latitude: lat, longitude: lng });
-    const qibla = calculateQiblaDirection(lat, lng);
-    setQiblaDirection(qibla);
+  /* --------------------------------------------------------
+     ✅ SET LOCATION + CALCULATE QIBLA (GLOBAL)
+     -------------------------------------------------------- */
+  const setUserLocationAndCalculateQibla = (lat, lon) => {
+    setUserLocation({ latitude: lat, longitude: lon });
+
+    const bearing = calculateQiblaBearing(lat, lon);
+    setQiblaDirection(bearing);
   };
 
-  /* ------------------------------------------------------------
-     ✅ GET FINAL ARROW ROTATION
-     (Qibla direction - device heading)
-     ------------------------------------------------------------ */
+  /* --------------------------------------------------------
+     ✅ FINAL ARROW ROTATION (Model A)
+     Arrow rotates to point TO Kaaba
+     -------------------------------------------------------- */
   const getQiblaAngle = () => {
     if (!qiblaDirection) return 0;
     return (qiblaDirection - deviceHeading + 360) % 360;
@@ -125,7 +122,7 @@ export const CompassProvider = ({ children }) => {
         setUserLocationAndCalculateQibla,
         startCompass,
         stopCompass,
-        getQiblaAngle
+        getQiblaAngle,
       }}
     >
       {children}
