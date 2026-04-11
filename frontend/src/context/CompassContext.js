@@ -17,12 +17,11 @@ export const CompassProvider = ({ children }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [compassError, setCompassError] = useState("");
 
-  /* ------------------------------------------
-     ✅ QIBLA BEARING (global, works anywhere)
-     ------------------------------------------ */
+  // ✅ Qibla bearing from GPS (global, no hardcoding)
   const calculateQiblaBearing = (lat, lon) => {
     const kaabaLat = 21.4225 * Math.PI / 180;
     const kaabaLon = 39.8262 * Math.PI / 180;
+
     const φ1 = lat * Math.PI / 180;
     const λ1 = lon * Math.PI / 180;
 
@@ -31,34 +30,28 @@ export const CompassProvider = ({ children }) => {
       Math.cos(φ1) * Math.tan(kaabaLat) -
       Math.sin(φ1) * Math.cos(kaabaLon - λ1);
 
-    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
     return (bearing + 360) % 360;
   };
 
-  /* ------------------------------------------
-     ✅ FIXED HEADING FOR ALL DEVICES
-     ------------------------------------------ */
+  // ✅ Correct device heading
   const handleCompass = (event) => {
     let heading = null;
 
-    // ✅ iPhone/iPad (Safari) → MUST invert
-    if (typeof event.webkitCompassHeading !== "undefined") {
-      heading = (360 - event.webkitCompassHeading) % 360;
+    // ✅ iOS Safari — already correct
+    if (typeof event.webkitCompassHeading === "number") {
+      heading = event.webkitCompassHeading;
     }
-
-    // ✅ Android (Chrome)
-    else if (event.alpha != null) {
+    // ✅ Android Chrome
+    else if (typeof event.alpha === "number") {
       heading = (360 - event.alpha + 90) % 360;
     }
 
-    if (heading !== null && !isNaN(heading)) {
+    if (heading !== null && !Number.isNaN(heading)) {
       setDeviceHeading(heading);
     }
   };
 
-  /* ------------------------------------------
-     ✅ START COMPASS
-     ------------------------------------------ */
   const startCompass = async () => {
     try {
       setCompassError("");
@@ -68,7 +61,7 @@ export const CompassProvider = ({ children }) => {
         return;
       }
 
-      // ✅ iOS permission model
+      // ✅ iOS permission
       if (typeof DeviceOrientationEvent.requestPermission === "function") {
         const permission = await DeviceOrientationEvent.requestPermission();
         if (permission !== "granted") {
@@ -79,31 +72,22 @@ export const CompassProvider = ({ children }) => {
 
       window.addEventListener("deviceorientation", handleCompass, true);
       setCompassActive(true);
-
-    } catch (err) {
+    } catch {
       setCompassError("Failed to start compass");
     }
   };
 
-  /* ------------------------------------------
-     ✅ STOP COMPASS
-     ------------------------------------------ */
   const stopCompass = () => {
     window.removeEventListener("deviceorientation", handleCompass, true);
     setCompassActive(false);
   };
 
-  /* ------------------------------------------
-     ✅ SET GPS → CALCULATE QIBLA
-     ------------------------------------------ */
   const setUserLocationAndCalculateQibla = (lat, lon) => {
     setUserLocation({ latitude: lat, longitude: lon });
     setQiblaDirection(calculateQiblaBearing(lat, lon));
   };
 
-  /* ------------------------------------------
-     ✅ ARROW ROTATION (MODEL A)
-     ------------------------------------------ */
+  // ✅ MODEL A arrow rotation
   const getQiblaAngle = () => {
     if (qiblaDirection === null) return 0;
     return (qiblaDirection - deviceHeading + 360) % 360;
