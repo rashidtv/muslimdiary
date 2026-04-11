@@ -33,23 +33,21 @@ export const CompassProvider = ({ children }) => {
     return (bearing + 360) % 360;
   };
 
-  // ✅ Correct heading normalization (iOS + Android)
-  const handleCompass = (event) => {
-    let heading = null;
+const handleCompass = (event) => {const handleCompass =  // ✅ iPhone / iOS Safari — MUST INVERT
+  if (typeof event.webkitCompassHeading !== "undefined") {
+    heading = (360 - event.webkitCompassHeading) % 360;
+  }
 
-    // iOS (Safari)
-    if (typeof event.webkitCompassHeading !== "undefined") {
-      heading = event.webkitCompassHeading;
-    }
-    // Android (Chrome)
-    else if (event.alpha != null) {
-      heading = (360 - event.alpha + 90) % 360;
-    }
+  // ✅ Android (Chrome)
+  else if (event.alpha != null) {
+    heading = (360 - event.alpha + 90) % 360;
+  }
 
-    if (heading != null && !isNaN(heading)) {
-      setDeviceHeading(heading);
-    }
-  };
+  if (heading !== null && !isNaN(heading)) {
+    setDeviceHeading(heading);
+  }
+};
+  let heading = null;
 
   const startCompass = async () => {
     try {
