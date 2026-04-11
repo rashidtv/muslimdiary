@@ -14,10 +14,9 @@ export const CompassProvider = ({ children }) => {
   const [qiblaDirection, setQiblaDirection] = useState(null);
   const [deviceHeading, setDeviceHeading] = useState(0);
   const [compassActive, setCompassActive] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
   const [compassError, setCompassError] = useState("");
 
-  // ✅ Qibla bearing from GPS (global, no hardcoding)
+  // ✅ Global Qibla bearing (works anywhere)
   const calculateQiblaBearing = (lat, lon) => {
     const kaabaLat = 21.4225 * Math.PI / 180;
     const kaabaLon = 39.8262 * Math.PI / 180;
@@ -34,11 +33,11 @@ export const CompassProvider = ({ children }) => {
     return (bearing + 360) % 360;
   };
 
-  // ✅ Correct device heading
+  // ✅ Device heading (simple & stable)
   const handleCompass = (event) => {
     let heading = null;
 
-    // ✅ iOS Safari — already correct
+    // ✅ iOS Safari
     if (typeof event.webkitCompassHeading === "number") {
       heading = event.webkitCompassHeading;
     }
@@ -61,7 +60,7 @@ export const CompassProvider = ({ children }) => {
         return;
       }
 
-      // ✅ iOS permission
+      // iOS permission
       if (typeof DeviceOrientationEvent.requestPermission === "function") {
         const permission = await DeviceOrientationEvent.requestPermission();
         if (permission !== "granted") {
@@ -83,11 +82,10 @@ export const CompassProvider = ({ children }) => {
   };
 
   const setUserLocationAndCalculateQibla = (lat, lon) => {
-    setUserLocation({ latitude: lat, longitude: lon });
     setQiblaDirection(calculateQiblaBearing(lat, lon));
   };
 
-  // ✅ MODEL A arrow rotation
+  // ✅ Arrow‑only rotation
   const getQiblaAngle = () => {
     if (qiblaDirection === null) return 0;
     return (qiblaDirection - deviceHeading + 360) % 360;
@@ -99,7 +97,6 @@ export const CompassProvider = ({ children }) => {
         qiblaDirection,
         deviceHeading,
         compassActive,
-        userLocation,
         compassError,
         setUserLocationAndCalculateQibla,
         startCompass,
@@ -111,3 +108,4 @@ export const CompassProvider = ({ children }) => {
     </CompassContext.Provider>
   );
 };
+``
