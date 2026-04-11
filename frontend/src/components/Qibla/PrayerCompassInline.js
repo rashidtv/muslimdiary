@@ -3,8 +3,9 @@ import { Box, Typography, Button } from '@mui/material';
 import { Refresh, CompassCalibration } from '@mui/icons-material';
 import { useCompass } from '../../context/CompassContext';
 
-const ALIGN_THRESHOLD = 5;      // degrees
-const SMOOTHING = 0.12;         // lower = smoother
+// Smooth motion factor
+const SMOOTHING = 0.15;
+const ALIGN_THRESHOLD = 5;
 
 const PrayerCompassInline = () => {
   const {
@@ -18,39 +19,37 @@ const PrayerCompassInline = () => {
     getQiblaAngle
   } = useCompass();
 
-  const [smoothedAngle, setSmoothedAngle] = useState(0);
-  const lastVibrate = useRef(0);
+  const [smoothed, setSmoothed] = useState(0);
+  const vibrateRef = useRef(0);
 
-  const rawAngle = getQiblaAngle();
-  const isAligned = Math.abs(rawAngle) <= ALIGN_THRESHOLD;
-
-  /* ✅ Auto‑start compass */
+  // Auto-start compass for better UX
   useEffect(() => {
     if (!compassActive) startCompass();
-    // eslint-disable-next-line
-  }, []);
+  }, [compassActive, startCompass]);
 
-  /* ✅ Smooth angle using linear interpolation */
-  useEffect(() => {
-    setSmoothedAngle(prev =>
-      prev + (rawAngle - prev) * SMOOTHING
-    );
-  }, [rawAngle]);
+  const angle = getQiblaAngle(); // Qibla - heading
+  const isAligned = Math.abs(angle) <= ALIGN_THRESHOLD;
 
-  /* ✅ Gentle vibration when aligned */
+  // Smooth rotation
   useEffect(() => {
-    if (!isAligned || !navigator.vibrate) return;
+    setSmoothed(prev => prev + (angle - prev) * SMOOTHING);
+  }, [angle]);
+
+  // Gentle vibration on alignment
+  useEffect(() => {
+    if (!navigator.vibrate) return;
+    if (!isAligned) return;
 
     const now = Date.now();
-    if (now - lastVibrate.current > 2500) {
-      navigator.vibrate(20);
-      lastVibrate.current = now;
+    if (now - vibrateRef.current > 2500) {
+      navigator.vibrate(15);
+      vibrateRef.current = now;
     }
   }, [isAligned]);
 
-  const fetchLocation = () => {
+  const refreshLocation = () => {
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
+      pos =>
         setUserLocationAndCalculateQibla(
           pos.coords.latitude,
           pos.coords.longitude
@@ -67,27 +66,27 @@ const PrayerCompassInline = () => {
         borderRadius: 3,
         border: '1px solid',
         borderColor: 'divider',
-        backgroundColor: '#fff',
-        maxWidth: 220,
+        background: 'white',
+        maxWidth: 240,
         mx: 'auto'
       }}
     >
-      <Typography variant="h6" fontWeight={600} textAlign="center" mb={1}>
-        🧭 Qibla
+      <Typography variant="h6" fontWeight={600} textAlign="center" mb={2}>
+        🧭 Qibla Direction
       </Typography>
 
       {compassError && (
-        <Typography color="error" variant="body2">
+        <Typography variant="body2" color="error" mb={1}>
           {compassError}
         </Typography>
       )}
 
-      {/* ✅ Compass */}
+      {/* Compass ring */}
       <Box
         sx={{
           position: 'relative',
-          width: 120,
-          height: 120,
+          width: 130,
+          height: 130,
           mx: 'auto',
           borderRadius: '50%',
           border: '2px solid #E5E7EB',
@@ -95,14 +94,14 @@ const PrayerCompassInline = () => {
           mb: 1
         }}
       >
-        {/* ✅ Tick marks */}
+        {/* Ticks */}
         {[0, 90, 180, 270].map(deg => (
           <Box
             key={deg}
             sx={{
               position: 'absolute',
               width: 2,
-              height: 8,
+              height: 10,
               backgroundColor: '#9CA3AF',
               top: 0,
               left: '50%',
@@ -111,42 +110,43 @@ const PrayerCompassInline = () => {
           />
         ))}
 
-        {/* ✅ Arrow */}
+        {/* Arrow shaft */}
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
-            width: 2,
-            height: 48,
+            width: 3,
+            height: 55,
             backgroundColor: isAligned ? '#22C55E' : '#0D9488',
-            transform: `translate(-50%, -50%) rotate(${smoothedAngle}deg)`,
+            transform: `translate(-50%, -50%) rotate(${smoothed}deg)`,
             transformOrigin: 'center center',
-            transition: 'background-color 0.3s'
+            transition: 'background-color 0.25s'
           }}
         />
 
-        {/* ✅ Kaaba icon (REAL DOM) */}
+        {/* ✅ REAL Kaaba icon (not pseudo-element) */}
         <Box
           sx={{
             position: 'absolute',
-            top: 4,
+            top: '50%',
             left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '0.9rem'
+            transform: `translate(-50%, -68px) rotate(${smoothed}deg)`,
+            transformOrigin: 'center center',
+            fontSize: '1.2rem'
           }}
         >
           🕋
         </Box>
 
-        {/* ✅ Center dot */}
+        {/* Center dot */}
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
-            width: 8,
-            height: 8,
+            width: 10,
+            height: 10,
             backgroundColor: '#DC2626',
             borderRadius: '50%',
             transform: 'translate(-50%, -50%)'
@@ -154,6 +154,7 @@ const PrayerCompassInline = () => {
         />
       </Box>
 
+      {/* Alignment text */}
       <Typography
         variant="caption"
         display="block"
@@ -161,11 +162,14 @@ const PrayerCompassInline = () => {
         color={isAligned ? 'success.main' : 'text.secondary'}
         mb={1}
       >
-        {isAligned ? 'Aligned with Qibla' : `Turn ${rawAngle.toFixed(0)}°`}
+        {isAligned
+          ? 'Aligned with Qibla ✅'
+          : `Turn ${angle.toFixed(0)}°`}
       </Typography>
 
+      {/* Controls */}
       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-        <Button size="small" variant="outlined" onClick={fetchLocation}>
+        <Button size="small" variant="outlined" onClick={refreshLocation}>
           <Refresh fontSize="small" />
         </Button>
         <Button
