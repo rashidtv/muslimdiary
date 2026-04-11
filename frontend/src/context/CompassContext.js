@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 
-const CompassContext = createContext();
+const CompassContext = createContext(null);
 
 export const useCompass = () => {
   const ctx = useContext(CompassContext);
@@ -16,7 +16,7 @@ export const CompassProvider = ({ children }) => {
   const [compassActive, setCompassActive] = useState(false);
   const [compassError, setCompassError] = useState("");
 
-  // ✅ Global Qibla bearing (works anywhere)
+  // ✅ Global Qibla bearing from GPS
   const calculateQiblaBearing = (lat, lon) => {
     const kaabaLat = 21.4225 * Math.PI / 180;
     const kaabaLon = 39.8262 * Math.PI / 180;
@@ -33,15 +33,15 @@ export const CompassProvider = ({ children }) => {
     return (bearing + 360) % 360;
   };
 
-  // ✅ Device heading (simple & stable)
+  // ✅ Stable heading handling (arrow‑only)
   const handleCompass = (event) => {
     let heading = null;
 
-    // ✅ iOS Safari
+    // iOS Safari
     if (typeof event.webkitCompassHeading === "number") {
       heading = event.webkitCompassHeading;
     }
-    // ✅ Android Chrome
+    // Android Chrome
     else if (typeof event.alpha === "number") {
       heading = (360 - event.alpha + 90) % 360;
     }
@@ -82,7 +82,8 @@ export const CompassProvider = ({ children }) => {
   };
 
   const setUserLocationAndCalculateQibla = (lat, lon) => {
-    setQiblaDirection(calculateQiblaBearing(lat, lon));
+    const bearing = calculateQiblaBearing(lat, lon);
+    setQiblaDirection(bearing);
   };
 
   // ✅ Arrow‑only rotation
@@ -108,4 +109,3 @@ export const CompassProvider = ({ children }) => {
     </CompassContext.Provider>
   );
 };
-``
