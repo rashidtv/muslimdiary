@@ -3,7 +3,9 @@ import { Box, Typography, Button } from '@mui/material';
 import { Refresh, CompassCalibration } from '@mui/icons-material';
 import { useCompass } from '../../context/CompassContext';
 
-const SMOOTH = 0.15;
+const SMOOTH = 0.12;
+const CIRCLE_SIZE = 150;
+const KAABA_OFFSET = 18; // slightly inside circle (Option B)
 
 const PrayerCompassInline = () => {
   const {
@@ -18,16 +20,26 @@ const PrayerCompassInline = () => {
 
   const [smoothAngle, setSmoothAngle] = useState(0);
 
-  // ✅ Correct angle math
-  const rawAngle = ((qiblaDirection - deviceHeading) + 360) % 360;
+  // ✅ Correct arrow rotation
+  const arrowAngle = ((qiblaDirection - deviceHeading) + 360) % 360;
 
+  // ✅ Smooth transitions
+  useEffect(() => {
+    setSmoothAngle(prev => prev + (arrowAngle - prev) * SMOOTH);
+  }, [arrowAngle]);
+
+  // ✅ Auto‑start compass
   useEffect(() => {
     if (!compassActive) startCompass();
   }, [compassActive, startCompass]);
 
-  useEffect(() => {
-    setSmoothAngle(prev => prev + (rawAngle - prev) * SMOOTH);
-  }, [rawAngle]);
+  // ✅ Kaaba position on circle rim
+  const kaabaRad = (qiblaDirection - 90) * (Math.PI / 180); 
+  // subtract 90° so 0° starts at North visually
+
+  const radius = CIRCLE_SIZE / 2 - KAABA_OFFSET;
+  const kaabaX = (CIRCLE_SIZE / 2) + radius * Math.cos(kaabaRad);
+  const kaabaY = (CIRCLE_SIZE / 2) + radius * Math.sin(kaabaRad);
 
   const refreshLocation = () => {
     navigator.geolocation.getCurrentPosition(
@@ -55,55 +67,45 @@ const PrayerCompassInline = () => {
         🧭 Qibla Direction
       </Typography>
 
-      {/* ✅ Compass Circle */}
+      {/* ✅ Compass circle */}
       <Box
         sx={{
           position: 'relative',
-          width: 150,
-          height: 150,
+          width: CIRCLE_SIZE,
+          height: CIRCLE_SIZE,
           mx: 'auto',
           borderRadius: '50%',
           border: '2px solid #DFDFDF',
           background: '#FAFAFA'
         }}
       >
-
-        {/* ✅ Kaaba inside circle at TOP center */}
+        {/* ✅ Kaaba placed at correct spherical Qibla direction */}
         <Box
           sx={{
             position: 'absolute',
-            top: 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '1.4rem'
+            top: kaabaY - 14,
+            left: kaabaX - 14,
+            fontSize: '1.5rem',
+            transition: 'top 0.2s, left 0.2s'
           }}
         >
           🕋
         </Box>
 
-        {/* ✅ Arrow (shaft + head) centered correctly */}
+        {/* ✅ Arrow that rotates toward Kaaba */}
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
             width: 4,
-            height: 60,
+            height: radius - 10,
+            backgroundColor: '#0D9488',
             transform: `translate(-50%, -100%) rotate(${smoothAngle}deg)`,
-            transformOrigin: '50% 100%',
+            transformOrigin: '50% 100%'
           }}
         >
-          {/* Arrow shaft */}
-          <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              background: '#0D9488',
-              borderRadius: 2
-            }}
-          />
-
-          {/* ✅ Arrowhead ATTACHED to shaft */}
+          {/* Arrowhead */}
           <Box
             sx={{
               position: 'absolute',
@@ -112,14 +114,14 @@ const PrayerCompassInline = () => {
               transform: 'translateX(-50%)',
               width: 0,
               height: 0,
-              borderLeft: '8px solid transparent',
-              borderRight: '8px solid transparent',
+              borderLeft: '7px solid transparent',
+              borderRight: '7px solid transparent',
               borderBottom: '14px solid #0D9488'
             }}
           />
         </Box>
 
-        {/* ✅ Center red dot */}
+        {/* ✅ Center dot */}
         <Box
           sx={{
             position: 'absolute',
@@ -134,12 +136,11 @@ const PrayerCompassInline = () => {
         />
       </Box>
 
-      {/* ✅ Turn hint */}
       <Typography variant="caption" sx={{ mt: 2, display: 'block' }}>
-        Turn {rawAngle.toFixed(0)}°
+        Turn {arrowAngle.toFixed(0)}°
       </Typography>
 
-      {/* ✅ Controls */}
+      {/* ✅ Buttons */}
       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 2 }}>
         <Button variant="outlined" size="small" onClick={refreshLocation}>
           <Refresh fontSize="small" />
@@ -152,6 +153,12 @@ const PrayerCompassInline = () => {
           <CompassCalibration fontSize="small" />
         </Button>
       </Box>
+
+      {compassError && (
+        <Typography color="error" fontSize="0.8rem" mt={1}>
+          {compassError}
+        </Typography>
+      )}
     </Box>
   );
 };
