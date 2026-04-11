@@ -1,15 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Box, Typography, Button, useTheme } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { Box, Typography, Button } from '@mui/material';
 import { Refresh, CompassCalibration } from '@mui/icons-material';
 import { useCompass } from '../../context/CompassContext';
 
-const ALIGNMENT_THRESHOLD = 3; // degrees
-const TILT_THRESHOLD = 35; // degrees (beta/gamma)
+const ALIGN_THRESHOLD = 5;      // degrees
+const SMOOTHING = 0.12;         // lower = smoother
 
 const PrayerCompassInline = () => {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
   const {
     qiblaDirection,
     deviceHeading,
@@ -21,43 +18,35 @@ const PrayerCompassInline = () => {
     getQiblaAngle
   } = useCompass();
 
-  const lastVibrateRef = useRef(0);
-  const tiltRef = useRef({ beta: 0, gamma: 0 });
+  const [smoothedAngle, setSmoothedAngle] = useState(0);
+  const lastVibrate = useRef(0);
 
-  const angle = getQiblaAngle();
-  const isAligned = Math.abs(angle) <= ALIGNMENT_THRESHOLD;
+  const rawAngle = getQiblaAngle();
+  const isAligned = Math.abs(rawAngle) <= ALIGN_THRESHOLD;
 
-  /* --------------------------------------------------
-     ✅ Gentle vibration when aligned
-     -------------------------------------------------- */
+  /* ✅ Auto‑start compass */
+  useEffect(() => {
+    if (!compassActive) startCompass();
+    // eslint-disable-next-line
+  }, []);
+
+  /* ✅ Smooth angle using linear interpolation */
+  useEffect(() => {
+    setSmoothedAngle(prev =>
+      prev + (rawAngle - prev) * SMOOTHING
+    );
+  }, [rawAngle]);
+
+  /* ✅ Gentle vibration when aligned */
   useEffect(() => {
     if (!isAligned || !navigator.vibrate) return;
 
     const now = Date.now();
-    if (now - lastVibrateRef.current > 3000) {
-      navigator.vibrate(20); // gentle haptic
-      lastVibrateRef.current = now;
+    if (now - lastVibrate.current > 2500) {
+      navigator.vibrate(20);
+      lastVibrate.current = now;
     }
   }, [isAligned]);
-
-  /* --------------------------------------------------
-     ✅ Tilt detection (hold phone flat)
-     -------------------------------------------------- */
-  useEffect(() => {
-    const handleOrientation = (e) => {
-      tiltRef.current = {
-        beta: e.beta || 0,
-        gamma: e.gamma || 0
-      };
-    };
-
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, []);
-
-  const isTilted =
-    Math.abs(tiltRef.current.beta) > TILT_THRESHOLD ||
-    Math.abs(tiltRef.current.gamma) > TILT_THRESHOLD;
 
   const fetchLocation = () => {
     navigator.geolocation.getCurrentPosition(
@@ -78,20 +67,22 @@ const PrayerCompassInline = () => {
         borderRadius: 3,
         border: '1px solid',
         borderColor: 'divider',
-        backgroundColor: isDark ? '#111827' : '#FFFFFF'
+        backgroundColor: '#fff',
+        maxWidth: 220,
+        mx: 'auto'
       }}
     >
-      <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
+      <Typography variant="h6" fontWeight={600} textAlign="center" mb={1}>
         🧭 Qibla
       </Typography>
 
       {compassError && (
-        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+        <Typography color="error" variant="body2">
           {compassError}
         </Typography>
       )}
 
-      {/* ✅ Compass Ring */}
+      {/* ✅ Compass */}
       <Box
         sx={{
           position: 'relative',
@@ -99,52 +90,54 @@ const PrayerCompassInline = () => {
           height: 120,
           mx: 'auto',
           borderRadius: '50%',
-          border: `2px solid ${isDark ? '#374151' : '#E5E7EB'}`,
-          background: isDark ? '#020617' : '#FAFAFA',
+          border: '2px solid #E5E7EB',
+          background: '#FAFAFA',
           mb: 1
         }}
       >
-        {/* ✅ Cardinal markers */}
-        {['N', 'E', 'S', 'W'].map((d, i) => (
-          <Typography
-            key={d}
+        {/* ✅ Tick marks */}
+        {[0, 90, 180, 270].map(deg => (
+          <Box
+            key={deg}
             sx={{
               position: 'absolute',
-              fontSize: '0.65rem',
-              fontWeight: 'bold',
-              color: d === 'N' ? '#DC2626' : isDark ? '#9CA3AF' : '#6B7280',
-              ...(i === 0 && { top: 4, left: '50%', transform: 'translateX(-50%)' }),
-              ...(i === 1 && { right: 6, top: '50%', transform: 'translateY(-50%)' }),
-              ...(i === 2 && { bottom: 4, left: '50%', transform: 'translateX(-50%)' }),
-              ...(i === 3 && { left: 6, top: '50%', transform: 'translateY(-50%)' })
+              width: 2,
+              height: 8,
+              backgroundColor: '#9CA3AF',
+              top: 0,
+              left: '50%',
+              transform: `rotate(${deg}deg) translate(-50%, 0)`
             }}
-          >
-            {d}
-          </Typography>
+          />
         ))}
 
-        {/* ✅ Qibla Arrow */}
+        {/* ✅ Arrow */}
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
             width: 2,
-            height: 50,
+            height: 48,
             backgroundColor: isAligned ? '#22C55E' : '#0D9488',
-            transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+            transform: `translate(-50%, -50%) rotate(${smoothedAngle}deg)`,
             transformOrigin: 'center center',
-            transition: 'transform 0.2s ease-out',
-            '&::after': {
-              content: '"🕋"',
-              position: 'absolute',
-              top: -16,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontSize: '0.8rem'
-            }
+            transition: 'background-color 0.3s'
           }}
         />
+
+        {/* ✅ Kaaba icon (REAL DOM) */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 4,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '0.9rem'
+          }}
+        >
+          🕋
+        </Box>
 
         {/* ✅ Center dot */}
         <Box
@@ -161,32 +154,26 @@ const PrayerCompassInline = () => {
         />
       </Box>
 
-      {/* ✅ Status text */}
       <Typography
         variant="caption"
-        textAlign="center"
         display="block"
-        sx={{ mb: 1, color: isAligned ? '#22C55E' : 'text.secondary' }}
+        textAlign="center"
+        color={isAligned ? 'success.main' : 'text.secondary'}
+        mb={1}
       >
-        {isTilted
-          ? 'Hold phone flat 🧘'
-          : isAligned
-          ? 'Aligned with Qibla'
-          : `Turn ${angle.toFixed(0)}°`}
+        {isAligned ? 'Aligned with Qibla' : `Turn ${rawAngle.toFixed(0)}°`}
       </Typography>
 
-      {/* ✅ Controls */}
       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-        <Button size="small" variant="outlined" startIcon={<Refresh />} onClick={fetchLocation}>
-          Refresh
+        <Button size="small" variant="outlined" onClick={fetchLocation}>
+          <Refresh fontSize="small" />
         </Button>
         <Button
           size="small"
           variant={compassActive ? 'outlined' : 'contained'}
-          startIcon={<CompassCalibration />}
           onClick={compassActive ? stopCompass : startCompass}
         >
-          {compassActive ? 'Stop' : 'Start'}
+          <CompassCalibration fontSize="small" />
         </Button>
       </Box>
     </Box>
