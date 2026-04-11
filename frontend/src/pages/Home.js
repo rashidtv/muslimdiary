@@ -21,39 +21,43 @@ import PrayerCompassInline from '../components/Qibla/PrayerCompassInline';
 
 const Home = ({ onAuthAction }) => {
   const { user } = useAuth();
-  const [qiblaOpen, setQiblaOpen] = useState(false);
+  const [showQibla, setShowQibla] = useState(false);
 
   const quickActions = [
     { title: 'Quran', icon: <MenuBook />, action: '/quran' },
     { title: 'Dhikr / Du’a', icon: <Spa />, action: '/dua' },
-    { title: 'Qibla', icon: <CompassCalibration />, action: 'inline-qibla' },
+    { title: 'Qibla', icon: <CompassCalibration />, action: 'inlineQibla' },
     { title: 'Calendar', icon: <CalendarMonth />, action: '/calendar' }
   ];
 
   const handleQuickAction = (action) => {
-    if (action === 'inline-qibla') {
-      setQiblaOpen(true);
+    if (action === 'inlineQibla') {
+      setShowQibla(true);
       return;
     }
     window.location.href = action;
   };
 
   return (
-    <Box sx={{ pb: { xs: 2, md: 3 } }}>
+    <Box sx={{ pb: 2 }}>
       <Container maxWidth="md">
 
-        {/* ✅ PRAYER TIMES */}
+        {/* ✅ Prayer Times */}
         <PrayerTimes />
 
-        {/* ✅ INLINE QIBLA COMPASS */}
-        {qiblaOpen && (
+        {/* ✅ Inline Qibla Compass */}
+        {showQibla && (
           <Box sx={{ mt: 3 }}>
             <PrayerCompassInline />
           </Box>
         )}
 
         {/* ✅ QUICK ACTIONS */}
-        <Typography variant="h6" fontWeight={600} sx={{ mt: 3, mb: 1 }}>
+        <Typography
+          variant="h6"
+          fontWeight={600}
+          sx={{ mt: 3, mb: 1 }}
+        >
           Quick Actions
         </Typography>
 
@@ -67,12 +71,13 @@ const Home = ({ onAuthAction }) => {
                   borderRadius: 3,
                   textAlign: 'center',
                   p: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:hover': { backgroundColor: 'rgba(13,148,136,0.05)' }
+                  border: '1px solid #E5E7EB',
+                  '&:hover': {
+                    backgroundColor: 'rgba(13,148,136,0.05)'
+                  }
                 }}
               >
-                <CardContent sx={{ p: 0 }}>
+                <CardContent>
                   <Box sx={{ fontSize: 28, color: 'primary.main', mb: 1 }}>
                     {item.icon}
                   </Box>
@@ -84,30 +89,6 @@ const Home = ({ onAuthAction }) => {
             </Grid>
           ))}
         </Grid>
-
-        {/* ✅ CTA FOR NON-LOGGED USERS */}
-        {!user && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Track your prayers & progress
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Create an account to save prayer history and reminders.
-            </Typography>
-            <Typography
-              onClick={() => onAuthAction?.('register')}
-              sx={{
-                display: 'inline-block',
-                cursor: 'pointer',
-                fontWeight: 600,
-                color: 'primary.main'
-              }}
-            >
-              Create an account →
-            </Typography>
-          </Box>
-        )}
-
       </Container>
     </Box>
   );
