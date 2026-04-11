@@ -1,40 +1,71 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Dialog,
   Box,
   Typography,
   IconButton,
-  Button
+  Button,
+  Chip
 } from '@mui/material';
-import { Close, Refresh, CompassCalibration } from '@mui/icons-material';
+import {
+  Close,
+  Refresh,
+  CompassCalibration,
+  CheckCircle
+} from '@mui/icons-material';
 import { useCompass } from '../../context/CompassContext';
+
+const ALIGNMENT_THRESHOLD = 5; // degrees
 
 const QiblaModal = ({ open, onClose }) => {
   const {
     qiblaDirection,
-    userLocation,
+    deviceHeading,
     compassActive,
+    userLocation,
     setUserLocationAndCalculateQibla,
     startCompass,
     stopCompass,
     getQiblaAngle
   } = useCompass();
 
+  // Angle for arrow rotation
   const angle = getQiblaAngle();
 
-  // ✅ Request sensor permission (iOS Safari fix)
+  // ✅ Calculate alignment status
+  const isAligned = useMemo(() => {
+    if (
+      deviceHeading === null ||
+      qiblaDirection === null ||
+      Number.isNaN(deviceHeading) ||
+      Number.isNaN(qiblaDirection)
+    ) {
+      return false;
+    }
+
+    let diff = Math.abs(deviceHeading - qiblaDirection);
+    if (diff > 180) diff = 360 - diff;
+
+    return diff <= ALIGNMENT_THRESHOLD;
+  }, [deviceHeading, qiblaDirection]);
+
+  // ✅ iOS permission handling
   const requestPermission = async () => {
     if (
       window.DeviceOrientationEvent &&
       typeof DeviceOrientationEvent.requestPermission === 'function'
     ) {
-      const res = await DeviceOrientationEvent.requestPermission().catch(() => null);
-      return res === 'granted';
+      try {
+        const res = await DeviceOrientationEvent.requestPermission();
+        return res === 'granted';
+      } catch {
+        return false;
+      }
     }
     return true;
   };
 
-  // ✅ START MUST ALSO RECALCULATE QIBLA
+  // ✅ Start = permission + location + recalculation
   const handleStart = async () => {
     const ok = await requestPermission();
     if (!ok) return;
@@ -52,7 +83,6 @@ const QiblaModal = ({ open, onClose }) => {
         { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
-      // ✅ Force recalculation even if location exists
       setUserLocationAndCalculateQibla(
         userLocation.latitude,
         userLocation.longitude
@@ -61,20 +91,24 @@ const QiblaModal = ({ open, onClose }) => {
     }
   };
 
+  // ✅ Auto‑stop compass when modal closes (battery friendly)
+  const handleClose = () => {
+    if (compassActive) stopCompass();
+    onClose();
+  };
+
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       fullWidth
       maxWidth="xs"
-      PaperProps={{
-        sx: { borderRadius: 3, p: 2 }
-      }}
+      PaperProps={{ sx: { borderRadius: 3, p: 2 } }}
     >
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
         <Typography fontWeight={600}>🧭 Qibla Direction</Typography>
-        <IconButton onClick={onClose}>
+        <IconButton onClick={handleClose}>
           <Close />
         </IconButton>
       </Box>
@@ -107,7 +141,7 @@ const QiblaModal = ({ open, onClose }) => {
           N
         </Typography>
 
-        {/* Arrow */}
+        {/* ✅ Smooth rotating arrow */}
         <Box
           sx={{
             position: 'absolute',
@@ -115,9 +149,10 @@ const QiblaModal = ({ open, onClose }) => {
             left: '50%',
             width: 2,
             height: 55,
-            backgroundColor: '#0D9488',
+            backgroundColor: isAligned ? '#16A34A' : '#0D9488',
             transform: `translate(-50%, -50%) rotate(${angle}deg)`,
             transformOrigin: 'center center',
+            transition: 'transform 0.35s ease-out', // ✅ smooth animation
             '&::after': {
               content: '""',
               position: 'absolute',
@@ -126,12 +161,14 @@ const QiblaModal = ({ open, onClose }) => {
               transform: 'translateX(-50%)',
               borderLeft: '5px solid transparent',
               borderRight: '5px solid transparent',
-              borderBottom: '10px solid #0D9488'
+              borderBottom: isAligned
+                ? '10px solid #16A34A'
+                : '10px solid #0D9488'
             }
           }}
         />
 
-        {/* Center */}
+        {/* Center dot */}
         <Box
           sx={{
             position: 'absolute',
@@ -147,9 +184,28 @@ const QiblaModal = ({ open, onClose }) => {
         />
       </Box>
 
-      {/* Angle */}
+      {/* ✅ Alignment Indicator */}
+      <Box sx={{ textAlign: 'center', mb: 2 }}>
+        {isAligned ? (
+          <Chip
+            icon={<CheckCircle />}
+            label="Aligned ✅"
+            color="success"
+            variant="outlined"
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Rotate phone to align with Qibla
+          </Typography>
+        )}
+      </Box>
+
+      {/* Angle Info */}
       <Typography variant="body2" textAlign="center" sx={{ mb: 2 }}>
         Qibla: {(qiblaDirection || 0).toFixed(0)}°
+        {deviceHeading !== null && (
+          <> • Heading: {deviceHeading.toFixed(0)}°</>
+        )}
       </Typography>
 
       {/* Controls */}
@@ -163,11 +219,11 @@ const QiblaModal = ({ open, onClose }) => {
         </Button>
 
         <Button
-          variant={compassActive ? "outlined" : "contained"}
+          variant={compassActive ? 'outlined' : 'contained'}
           startIcon={<CompassCalibration />}
           onClick={compassActive ? stopCompass : handleStart}
         >
-          {compassActive ? "Stop" : "Start"}
+          {compassActive ? 'Stop' : 'Start'}
         </Button>
       </Box>
 
@@ -177,7 +233,7 @@ const QiblaModal = ({ open, onClose }) => {
         textAlign="center"
         sx={{ mt: 2, display: 'block' }}
       >
-        Hold phone flat and rotate until arrow points upward.
+        Hold phone flat and rotate slowly until aligned.
       </Typography>
     </Dialog>
   );
