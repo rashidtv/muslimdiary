@@ -32,9 +32,30 @@ const PrayerCompassInline = () => {
   };
 
   const handleStartCompass = async () => {
-    const ok = await requestSensorPermission();
-    if (ok) startCompass();
-  };
+  const ok = await requestSensorPermission();
+  if (!ok) return;
+
+  // ✅ ENSURE location exists
+  if (!userLocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocationAndCalculateQibla(
+          pos.coords.latitude,
+          pos.coords.longitude
+        );
+        startCompass(); // ✅ start AFTER recalculation
+      },
+      () => {}
+    );
+  } else {
+    // ✅ Force recalculation even if location exists
+    setUserLocationAndCalculateQibla(
+      userLocation.latitude,
+      userLocation.longitude
+    );
+    startCompass();
+  }
+};
 
   const fetchLocation = () => {
     navigator.geolocation.getCurrentPosition(
