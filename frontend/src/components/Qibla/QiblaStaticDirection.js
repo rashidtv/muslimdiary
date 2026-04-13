@@ -15,78 +15,82 @@ const QiblaStaticDirection = () => {
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-
-        setUserLocationAndCalculateQibla(lat, lon);
-        setLocationLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        const { latitude, longitude } = pos.coords;
+        setUserLocationAndCalculateQibla(latitude, longitude);
+        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },
       () => setLocationLabel("Location unavailable"),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000
-      }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [setUserLocationAndCalculateQibla]);
+  }, []);
 
   const refreshLocation = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-
-        setUserLocationAndCalculateQibla(lat, lon);
-        setLocationLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        const { latitude, longitude } = pos.coords;
+        setUserLocationAndCalculateQibla(latitude, longitude);
+        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },
       () => {},
       { enableHighAccuracy: true }
     );
   };
 
-  // ✅ Convert angle to compass text (NE/NW/etc)
+  // Determine compass label (N, NE, E, SE, etc.)
   const getDirectionLabel = (deg) => {
-    if (deg === null) return "";
+    if (deg == null) return "";
     const dirs = ["North", "North‑East", "East", "South‑East", "South", "South‑West", "West", "North‑West"];
     return dirs[Math.round(deg / 45) % 8];
+  };
+
+  // Choose arrow emoji for direction
+  const getDirectionArrow = (deg) => {
+    if (deg == null) return "⬆️";
+    const arrows = ["⬆️","↗️","➡️","↘️","⬇️","↙️","⬅️","↖️"];
+    return arrows[Math.round(deg / 45) % 8];
   };
 
   return (
     <Box
       sx={{
         p: 3,
-        border: "1px solid #E5E7EB",
         borderRadius: 4,
+        border: "1px solid #E5E7EB",
         background: "white",
         textAlign: "center"
       }}
     >
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+      <Typography variant="h6" fontWeight={700}>
         🧭 Qibla Direction
       </Typography>
 
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        <MyLocation sx={{ fontSize: 16, mr: 0.5 }} />
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <MyLocation sx={{ fontSize: 15, mr: 0.5 }} />
         {locationLabel}
       </Typography>
 
       {qiblaDirection !== null && (
         <>
+          <Typography variant="h3" fontWeight={700} color="primary.main" sx={{ mt: 2 }}>
+            {getDirectionArrow(qiblaDirection)}
+          </Typography>
+
           <Typography variant="h4" fontWeight={700} color="primary.main">
             {qiblaDirection.toFixed(0)}°
           </Typography>
 
-          <Typography variant="body1" sx={{ mt: 1 }}>
+          <Typography variant="body1" sx={{ mt: 1, fontWeight: 600 }}>
             {getDirectionLabel(qiblaDirection)}
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Face your body toward the direction above.
+            Face your body toward the direction shown above.
           </Typography>
         </>
       )}
 
       {compassError && (
-        <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+        <Typography color="error" fontSize="0.8rem" sx={{ mt: 2 }}>
           {compassError}
         </Typography>
       )}
