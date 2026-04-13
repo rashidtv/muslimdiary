@@ -16,7 +16,7 @@ export const CompassProvider = ({ children }) => {
   const [compassActive, setCompassActive] = useState(false);
   const [compassError, setCompassError] = useState("");
 
-  // ✅ Global Qibla bearing from GPS
+  // ✅ Global Qibla bearing (works anywhere on Earth)
   const calculateQiblaBearing = (lat, lon) => {
     const kaabaLat = 21.4225 * Math.PI / 180;
     const kaabaLon = 39.8262 * Math.PI / 180;
@@ -33,15 +33,16 @@ export const CompassProvider = ({ children }) => {
     return (bearing + 360) % 360;
   };
 
-  // ✅ Stable heading handling (arrow‑only)
+  // ✅ iPhone + Android heading normalization
   const handleCompass = (event) => {
     let heading = null;
 
-    // iOS Safari
+    // ✅ iOS Safari
     if (typeof event.webkitCompassHeading === "number") {
       heading = event.webkitCompassHeading;
     }
-    // Android Chrome
+
+    // ✅ Android
     else if (typeof event.alpha === "number") {
       heading = (360 - event.alpha + 90) % 360;
     }
@@ -60,7 +61,7 @@ export const CompassProvider = ({ children }) => {
         return;
       }
 
-      // iOS permission
+      // ✅ iOS permission requirement
       if (typeof DeviceOrientationEvent.requestPermission === "function") {
         const permission = await DeviceOrientationEvent.requestPermission();
         if (permission !== "granted") {
@@ -71,6 +72,7 @@ export const CompassProvider = ({ children }) => {
 
       window.addEventListener("deviceorientation", handleCompass, true);
       setCompassActive(true);
+
     } catch {
       setCompassError("Failed to start compass");
     }
@@ -86,7 +88,7 @@ export const CompassProvider = ({ children }) => {
     setQiblaDirection(bearing);
   };
 
-  // ✅ Arrow‑only rotation
+  // ✅ Arrow rotation (stable)
   const getQiblaAngle = () => {
     if (qiblaDirection === null) return 0;
     return (qiblaDirection - deviceHeading + 360) % 360;
@@ -99,10 +101,10 @@ export const CompassProvider = ({ children }) => {
         deviceHeading,
         compassActive,
         compassError,
-        setUserLocationAndCalculateQibla,
         startCompass,
         stopCompass,
-        getQiblaAngle
+        setUserLocationAndCalculateQibla,
+        getQiblaAngle,
       }}
     >
       {children}
