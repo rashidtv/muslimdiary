@@ -17,7 +17,7 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import PrayerTimes from "../components/PrayerTimes/PrayerTimes";
-import QiblaStaticDirection from "../components/Qibla/QiblaStaticDirection"; // ✅ STATIC QIBLA
+import QiblaStaticDirection from "../components/Qibla/QiblaStaticDirection";
 
 const Home = ({ onAuthAction }) => {
   const { user } = useAuth();
@@ -31,10 +31,7 @@ const Home = ({ onAuthAction }) => {
   ];
 
   const handleQuickAction = (action) => {
-    if (action === "qibla") {
-      setShowQibla(true);
-      return;
-    }
+    if (action === "qibla") return setShowQibla(true);
     window.location.href = action;
   };
 
@@ -42,22 +39,15 @@ const Home = ({ onAuthAction }) => {
     <Box sx={{ pb: { xs: 2, md: 3 } }}>
       <Container maxWidth="md">
 
-        {/* ✅ MAIN PRAYER TIMES */}
         <PrayerTimes />
 
-        {/* ✅ STATIC QIBLA CARD */}
         {showQibla && (
           <Box sx={{ mt: 3 }}>
             <QiblaStaticDirection />
           </Box>
         )}
 
-        {/* ✅ QUICK ACTIONS */}
-        <Typography
-          variant="h6"
-          fontWeight={600}
-          sx={{ mt: 3, mb: 1 }}
-        >
+        <Typography variant="h6" fontWeight={600} sx={{ mt: 3, mb: 1 }}>
           Quick Actions
         </Typography>
 
@@ -77,16 +67,9 @@ const Home = ({ onAuthAction }) => {
                 }}
               >
                 <CardContent sx={{ p: 0 }}>
-                  <Box
-                    sx={{
-                      fontSize: 28,
-                      color: "primary.main",
-                      mb: 1
-                    }}
-                  >
+                  <Box sx={{ fontSize: 28, color: "primary.main", mb: 1 }}>
                     {item.icon}
                   </Box>
-
                   <Typography variant="body2" fontWeight={600}>
                     {item.title}
                   </Typography>
@@ -96,20 +79,14 @@ const Home = ({ onAuthAction }) => {
           ))}
         </Grid>
 
-        {/* ✅ CTA FOR NON‑LOGGED USER */}
         {!user && (
           <Box sx={{ textAlign: "center", mt: 4 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Track your prayers & progress
             </Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mb: 2 }}
-            >
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Create an account to save prayer history and reminders.
             </Typography>
-
             <Typography
               onClick={() => onAuthAction?.("register")}
               sx={{
