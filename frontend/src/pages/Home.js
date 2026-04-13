@@ -42,7 +42,7 @@ const Home = ({ onAuthAction }) => {
     <Box sx={{ pb: { xs: 2, md: 3 } }}>
       <Container maxWidth="md">
 
-        {/* ✅ MAIN PRAYER TIMES SECTION */}
+        {/* ✅ PRAYER TIMES */}
         <PrayerTimes />
 
         {/* ✅ INLINE QIBLA COMPASS */}
@@ -97,7 +97,7 @@ const Home = ({ onAuthAction }) => {
           ))}
         </Grid>
 
-        {/* ✅ CTA FOR NON-LOGGED USERS */}
+        {/* ✅ CTA (IF NOT LOGGED IN) */}
         {!user && (
           <Box sx={{ textAlign: "center", mt: 4 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
