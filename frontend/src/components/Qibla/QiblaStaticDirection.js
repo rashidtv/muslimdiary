@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, Button } from "@mui/material";
-import { MyLocation, Refresh } from "@mui/icons-material";
+import { Refresh, MyLocation } from "@mui/icons-material";
 import { useCompass } from "../../context/CompassContext";
 
 const QiblaStaticDirection = () => {
   const {
     qiblaDirection,
-    setUserLocationAndCalculateQibla,
-    compassError
+    compassError,
+    setUserLocationAndCalculateQibla
   } = useCompass();
 
   const [locationLabel, setLocationLabel] = useState("");
@@ -36,53 +36,55 @@ const QiblaStaticDirection = () => {
     );
   };
 
-  const directionLabel = (deg) => {
+  // ✅ Convert Qibla angle to direction text
+  const getLabel = (deg) => {
     if (deg == null) return "";
-    const dirs = [
+    const labels = [
       "North", "North‑East", "East", "South‑East",
       "South", "South‑West", "West", "North‑West"
     ];
-    return dirs[Math.round(deg / 45) % 8];
+    return labels[Math.round(deg / 45) % 8];
   };
 
   return (
-    <Box sx={{ p: 3, borderRadius: 4, border: "1px solid #E5E7EB", background: "white", textAlign: "center" }}>
+    <Box
+      sx={{
+        p: 3,
+        borderRadius: 4,
+        border: "1px solid #E5E7EB",
+        background: "white",
+        textAlign: "center"
+      }}
+    >
       <Typography variant="h6" fontWeight={700}>🧭 Qibla Direction</Typography>
 
-      <Typography variant="body2" sx={{ mt: 1 }} color="text.secondary">
-        <MyLocation sx={{ fontSize: 15 }} /> {locationLabel}
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <MyLocation sx={{ fontSize: 16, mr: 0.5 }} />
+        {locationLabel}
       </Typography>
 
       {qiblaDirection !== null && (
         <>
-          {/* ✅ Rotating Arrow SVG */}
+          {/* ✅ ROTATE THE ARROW SVG EXACTLY TO QIBLA DIRECTION */}
           <Box
+            component="img"
+            src="/qibla-arrow.svg"
+            alt="Qibla Arrow"
             sx={{
-              mt: 3,
               width: 80,
               height: 80,
-              mx: "auto",
-              position: "relative"
+              mt: 2,
+              transform: `rotate(${qiblaDirection}deg)`,
+              transition: "0.2s ease"
             }}
-          >
-            <Box
-              component="img"
-              src="/arrow-up.svg"   // ✅ ADD THIS SVG
-              alt="Qibla Direction Arrow"
-              sx={{
-                width: "100%",
-                height: "100%",
-                transform: `rotate(${qiblaDirection}deg)`
-              }}
-            />
-          </Box>
+          />
 
           <Typography variant="h4" fontWeight={700} color="primary.main" sx={{ mt: 1 }}>
             {qiblaDirection.toFixed(0)}°
           </Typography>
 
           <Typography variant="body1" sx={{ mt: 1, fontWeight: 600 }}>
-            {directionLabel(qiblaDirection)}
+            {getLabel(qiblaDirection)}
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -91,7 +93,12 @@ const QiblaStaticDirection = () => {
         </>
       )}
 
-      <Button variant="outlined" sx={{ mt: 3 }} startIcon={<Refresh />} onClick={refreshLocation}>
+      <Button
+        variant="outlined"
+        sx={{ mt: 3 }}
+        startIcon={<Refresh />}
+        onClick={refreshLocation}
+      >
         Refresh Location
       </Button>
 
