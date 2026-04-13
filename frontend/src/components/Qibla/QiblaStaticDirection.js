@@ -7,11 +7,12 @@ const QiblaStaticDirection = () => {
   const {
     qiblaDirection,
     compassError,
-    setUserLocationAndCalculateQibla
+    setUserLocationAndCalculateQibla,
   } = useCompass();
 
   const [locationLabel, setLocationLabel] = useState("");
 
+  /* ✅ Get GPS + calculate Qibla */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -20,10 +21,11 @@ const QiblaStaticDirection = () => {
         setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },
       () => setLocationLabel("Location unavailable"),
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);
 
+  /* ✅ Manual refresh */
   const refreshLocation = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -36,12 +38,18 @@ const QiblaStaticDirection = () => {
     );
   };
 
-  // ✅ Convert Qibla angle to direction text
-  const getLabel = (deg) => {
+  /* ✅ Convert numerical degrees to text label */
+  const getDirectionText = (deg) => {
     if (deg == null) return "";
     const labels = [
-      "North", "North‑East", "East", "South‑East",
-      "South", "South‑West", "West", "North‑West"
+      "North",
+      "North‑East",
+      "East",
+      "South‑East",
+      "South",
+      "South‑West",
+      "West",
+      "North‑West",
     ];
     return labels[Math.round(deg / 45) % 8];
   };
@@ -53,46 +61,61 @@ const QiblaStaticDirection = () => {
         borderRadius: 4,
         border: "1px solid #E5E7EB",
         background: "white",
-        textAlign: "center"
+        textAlign: "center",
       }}
     >
-      <Typography variant="h6" fontWeight={700}>🧭 Qibla Direction</Typography>
+      <Typography variant="h6" fontWeight={700}>
+        🧭 Qibla Direction
+      </Typography>
 
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        <MyLocation sx={{ fontSize: 16, mr: 0.5 }} />
+      {/* ✅ GPS coordinates */}
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mt: 1, display: "flex", justifyContent: "center", gap: 1 }}
+      >
+        <MyLocation sx={{ fontSize: 16 }} />
         {locationLabel}
       </Typography>
 
       {qiblaDirection !== null && (
         <>
-          {/* ✅ ROTATE THE ARROW SVG EXACTLY TO QIBLA DIRECTION */}
+          {/* ✅ Rotating SVG arrow: EXACT bearing */}
           <Box
             component="img"
             src="/qibla-arrow.svg"
             alt="Qibla Arrow"
             sx={{
+              mt: 3,
               width: 80,
               height: 80,
-              mt: 2,
               transform: `rotate(${qiblaDirection}deg)`,
-              transition: "0.2s ease"
+              transition: "transform 0.2s ease-out",
             }}
           />
 
-          <Typography variant="h4" fontWeight={700} color="primary.main" sx={{ mt: 1 }}>
+          {/* ✅ Numerical degrees */}
+          <Typography
+            variant="h4"
+            fontWeight={700}
+            color="primary.main"
+            sx={{ mt: 2 }}
+          >
             {qiblaDirection.toFixed(0)}°
           </Typography>
 
-          <Typography variant="body1" sx={{ mt: 1, fontWeight: 600 }}>
-            {getLabel(qiblaDirection)}
+          {/* ✅ Compass direction */}
+          <Typography variant="body1" fontWeight={600} sx={{ mt: 1 }}>
+            {getDirectionText(qiblaDirection)}
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Face your body toward the arrow direction.
+            Face your body toward the arrow direction shown above.
           </Typography>
         </>
       )}
 
+      {/* ✅ Refresh button */}
       <Button
         variant="outlined"
         sx={{ mt: 3 }}
@@ -102,8 +125,9 @@ const QiblaStaticDirection = () => {
         Refresh Location
       </Button>
 
+      {/* ✅ Error */}
       {compassError && (
-        <Typography color="error" sx={{ mt: 2 }}>
+        <Typography sx={{ mt: 2 }} color="error">
           {compassError}
         </Typography>
       )}
