@@ -11,15 +11,14 @@ const PrayerCompassInline = () => {
     compassActive,
     compassError,
     getQiblaAngle,
-    setUserLocationAndCalculateQibla,
     startCompass,
-    stopCompass
+    stopCompass,
+    setUserLocationAndCalculateQibla
   } = useCompass();
 
   const angle = getQiblaAngle();
   const [smoothAngle, setSmoothAngle] = useState(0);
 
-  // Smooth motion for arrow
   useEffect(() => {
     setSmoothAngle((prev) => prev + (angle - prev) * SMOOTHING);
   }, [angle]);
@@ -32,7 +31,7 @@ const PrayerCompassInline = () => {
           pos.coords.longitude
         ),
       () => {},
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true }
     );
   };
 
@@ -40,17 +39,17 @@ const PrayerCompassInline = () => {
     <Box
       sx={{
         p: 3,
-        borderRadius: 4,
+        borderRadius: 3,
         border: "1px solid #E5E7EB",
-        background: "#FFFFFF",
+        background: "white",
         textAlign: "center",
       }}
     >
-      <Typography fontWeight={600} sx={{ mb: 2 }}>
+      <Typography fontWeight={700} mb={2}>
         🧭 Qibla Direction
       </Typography>
 
-      {/* Compass Circle */}
+      {/* Compass */}
       <Box
         sx={{
           position: "relative",
@@ -62,7 +61,7 @@ const PrayerCompassInline = () => {
           background: "#FAFAFA",
         }}
       >
-        {/* Rotating Arrow */}
+        {/* Arrow */}
         <Box
           sx={{
             position: "absolute",
@@ -73,6 +72,7 @@ const PrayerCompassInline = () => {
             backgroundColor: "#0D9488",
             transform: `translate(-50%, -100%) rotate(${smoothAngle}deg)`,
             transformOrigin: "50% 100%",
+            transition: "transform 0.1s ease-out",
           }}
         >
           {/* Arrowhead */}
@@ -91,7 +91,7 @@ const PrayerCompassInline = () => {
           />
         </Box>
 
-        {/* Center Dot */}
+        {/* Center dot */}
         <Box
           sx={{
             position: "absolute",
@@ -99,36 +99,33 @@ const PrayerCompassInline = () => {
             left: "50%",
             width: 10,
             height: 10,
+            background: "#DC2626",
             borderRadius: "50%",
-            backgroundColor: "#DC2626",
             transform: "translate(-50%, -50%)",
           }}
         />
       </Box>
 
-      {/* Angle Display */}
       <Typography variant="caption" sx={{ mt: 2, display: "block" }}>
         Turn {angle.toFixed(0)}°
       </Typography>
 
-      {/* Buttons */}
       <Box sx={{ display: "flex", justifyContent: "center", gap: 1, mt: 2 }}>
-        <Button variant="outlined" size="small" onClick={refreshLocation}>
+        <Button size="small" variant="outlined" onClick={refreshLocation}>
           <Refresh fontSize="small" />
         </Button>
 
         <Button
-          variant={compassActive ? "outlined" : "contained"}
           size="small"
+          variant={compassActive ? "outlined" : "contained"}
           onClick={compassActive ? stopCompass : startCompass}
         >
           <CompassCalibration fontSize="small" />
         </Button>
       </Box>
 
-      {/* Errors */}
       {compassError && (
-        <Typography color="error" fontSize="0.8rem" sx={{ mt: 1 }}>
+        <Typography fontSize="0.8rem" color="error" mt={1}>
           {compassError}
         </Typography>
       )}
