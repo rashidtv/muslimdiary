@@ -15,70 +15,38 @@ const QiblaStaticDirection = () => {
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        setUserLocationAndCalculateQibla(lat, lon);
-        setLocationLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        const { latitude, longitude } = pos.coords;
+        setUserLocationAndCalculateQibla(latitude, longitude);
+        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       },
       () => setLocationLabel("Location unavailable"),
       { enableHighAccuracy: true }
     );
-  }, [setUserLocationAndCalculateQibla]);
+  }, []);
 
-  // ✅ 16‑point accurate compass arrows
-  const arrows16 = [
-    "⬆️",      // N
-    "⬆️↗️",    // NNE
-    "↗️",      // NE
-    "➡️↗️",    // ENE
-    "➡️",      // E
-    "↘️➡️",    // ESE
-    "↘️",      // SE
-    "⬇️↘️",    // SSE
-    "⬇️",      // S
-    "⬇️↙️",    // SSW
-    "↙️",      // SW
-    "⬅️↙️",    // WSW
-    "⬅️",      // W
-    "⬅️↖️",    // WNW
-    "↖️",      // NW
-    "⬆️↖️"     // NNW
-  ];
-
-  const getArrow = (deg) => {
-    if (deg == null) return "⬆️";
-    const index = Math.round(deg / 22.5) % 16;
-    return arrows16[index];
+  const refreshLocation = () => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLocationAndCalculateQibla(latitude, longitude);
+        setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      },
+      () => {},
+      { enableHighAccuracy: true }
+    );
   };
 
-  // ✅ 16‑point text labels
-  const labels16 = [
-    "North",
-    "North‑North‑East",
-    "North‑East",
-    "East‑North‑East",
-    "East",
-    "East‑South‑East",
-    "South‑East",
-    "South‑South‑East",
-    "South",
-    "South‑South‑West",
-    "South‑West",
-    "West‑South‑West",
-    "West",
-    "West‑North‑West",
-    "North‑West",
-    "North‑North‑West"
-  ];
-
-  const getLabel = (deg) => {
+  const directionLabel = (deg) => {
     if (deg == null) return "";
-    const index = Math.round(deg / 22.5) % 16;
-    return labels16[index];
+    const dirs = [
+      "North", "North‑East", "East", "South‑East",
+      "South", "South‑West", "West", "North‑West"
+    ];
+    return dirs[Math.round(deg / 45) % 8];
   };
 
   return (
-    <Box sx={{ p: 3, border: "1px solid #E5E7EB", borderRadius: 4, background: "white", textAlign: "center" }}>
+    <Box sx={{ p: 3, borderRadius: 4, border: "1px solid #E5E7EB", background: "white", textAlign: "center" }}>
       <Typography variant="h6" fontWeight={700}>🧭 Qibla Direction</Typography>
 
       <Typography variant="body2" sx={{ mt: 1 }} color="text.secondary">
@@ -87,25 +55,43 @@ const QiblaStaticDirection = () => {
 
       {qiblaDirection !== null && (
         <>
-          <Typography variant="h2" sx={{ mt: 2 }}>
-            {getArrow(qiblaDirection)}
-          </Typography>
+          {/* ✅ Rotating Arrow SVG */}
+          <Box
+            sx={{
+              mt: 3,
+              width: 80,
+              height: 80,
+              mx: "auto",
+              position: "relative"
+            }}
+          >
+            <Box
+              component="img"
+              src="/arrow-up.svg"   // ✅ ADD THIS SVG
+              alt="Qibla Direction Arrow"
+              sx={{
+                width: "100%",
+                height: "100%",
+                transform: `rotate(${qiblaDirection}deg)`
+              }}
+            />
+          </Box>
 
-          <Typography variant="h4" fontWeight={700} color="primary.main">
+          <Typography variant="h4" fontWeight={700} color="primary.main" sx={{ mt: 1 }}>
             {qiblaDirection.toFixed(0)}°
           </Typography>
 
           <Typography variant="body1" sx={{ mt: 1, fontWeight: 600 }}>
-            {getLabel(qiblaDirection)}
+            {directionLabel(qiblaDirection)}
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Face your body in the direction shown by the arrow.
+            Face your body toward the arrow direction.
           </Typography>
         </>
       )}
 
-      <Button variant="outlined" sx={{ mt: 3 }} startIcon={<Refresh />} onClick={() => window.location.reload()}>
+      <Button variant="outlined" sx={{ mt: 3 }} startIcon={<Refresh />} onClick={refreshLocation}>
         Refresh Location
       </Button>
 
