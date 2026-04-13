@@ -4,15 +4,9 @@ import { Refresh, MyLocation } from "@mui/icons-material";
 import { useCompass } from "../../context/CompassContext";
 
 const QiblaStaticDirection = () => {
-  const {
-    qiblaDirection,
-    compassError,
-    setUserLocationAndCalculateQibla,
-  } = useCompass();
-
+  const { qiblaDirection, compassError, setUserLocationAndCalculateQibla } = useCompass();
   const [locationLabel, setLocationLabel] = useState("");
 
-  /* ✅ Get GPS + calculate Qibla */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -25,7 +19,6 @@ const QiblaStaticDirection = () => {
     );
   }, []);
 
-  /* ✅ Manual refresh */
   const refreshLocation = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -38,96 +31,49 @@ const QiblaStaticDirection = () => {
     );
   };
 
-  /* ✅ Convert numerical degrees to text label */
   const getDirectionText = (deg) => {
     if (deg == null) return "";
-    const labels = [
-      "North",
-      "North‑East",
-      "East",
-      "South‑East",
-      "South",
-      "South‑West",
-      "West",
-      "North‑West",
-    ];
+    const labels = ["North", "North‑East", "East", "South‑East", "South", "South‑West", "West", "North‑West"];
     return labels[Math.round(deg / 45) % 8];
   };
 
   return (
-    <Box
-      sx={{
-        p: 3,
-        borderRadius: 4,
-        border: "1px solid #E5E7EB",
-        background: "white",
-        textAlign: "center",
-      }}
-    >
-      <Typography variant="h6" fontWeight={700}>
-        🧭 Qibla Direction
-      </Typography>
+    <Box sx={{ p: 3, borderRadius: 4, border: "1px solid #E5E7EB", background: "white", textAlign: "center" }}>
+      <Typography variant="h6" fontWeight={700}>🧭 Qibla Direction</Typography>
 
-      {/* ✅ GPS coordinates */}
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ mt: 1, display: "flex", justifyContent: "center", gap: 1 }}
-      >
-        <MyLocation sx={{ fontSize: 16 }} />
-        {locationLabel}
+      <Typography variant="body2" sx={{ mt: 1 }} color="text.secondary">
+        <MyLocation sx={{ fontSize: 15 }} /> {locationLabel}
       </Typography>
 
       {qiblaDirection !== null && (
         <>
-          {/* ✅ Rotating SVG arrow: EXACT bearing */}
-          <Box
-            component="img"
-            src="/qibla-arrow.svg"
-            alt="Qibla Arrow"
-            sx={{
-              mt: 3,
-              width: 80,
-              height: 80,
-              transform: `rotate(${qiblaDirection}deg)`,
-              transition: "transform 0.2s ease-out",
+          {/* ✅ REAL ROTATING SVG ARROW */}
+/arrow-up.svg0.3s ease"
+              display: "block",
+              margin: "24px auto"
             }}
           />
 
-          {/* ✅ Numerical degrees */}
-          <Typography
-            variant="h4"
-            fontWeight={700}
-            color="primary.main"
-            sx={{ mt: 2 }}
-          >
+          <Typography variant="h4" fontWeight={700} color="primary.main" sx={{ mt: 1 }}>
             {qiblaDirection.toFixed(0)}°
           </Typography>
 
-          {/* ✅ Compass direction */}
-          <Typography variant="body1" fontWeight={600} sx={{ mt: 1 }}>
+          <Typography variant="body1" sx={{ mt: 1, fontWeight: 600 }}>
             {getDirectionText(qiblaDirection)}
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Face your body toward the arrow direction shown above.
+            Face your body toward the arrow direction.
           </Typography>
         </>
       )}
 
-      {/* ✅ Refresh button */}
-      <Button
-        variant="outlined"
-        sx={{ mt: 3 }}
-        startIcon={<Refresh />}
-        onClick={refreshLocation}
-      >
+      <Button variant="outlined" sx={{ mt: 3 }} startIcon={<Refresh />} onClick={refreshLocation}>
         Refresh Location
       </Button>
 
-      {/* ✅ Error */}
       {compassError && (
-        <Typography sx={{ mt: 2 }} color="error">
+        <Typography color="error" sx={{ mt: 2 }}>
           {compassError}
         </Typography>
       )}
