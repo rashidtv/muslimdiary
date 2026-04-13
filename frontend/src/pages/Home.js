@@ -17,7 +17,7 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import PrayerTimes from "../components/PrayerTimes/PrayerTimes";
-import PrayerCompassInline from "../components/Qibla/PrayerCompassInline";
+import QiblaStaticDirection from "../components/Qibla/QiblaStaticDirection"; // ✅ STATIC QIBLA
 
 const Home = ({ onAuthAction }) => {
   const { user } = useAuth();
@@ -42,13 +42,13 @@ const Home = ({ onAuthAction }) => {
     <Box sx={{ pb: { xs: 2, md: 3 } }}>
       <Container maxWidth="md">
 
-        {/* ✅ PRAYER TIMES */}
+        {/* ✅ MAIN PRAYER TIMES */}
         <PrayerTimes />
 
-        {/* ✅ INLINE QIBLA COMPASS */}
+        {/* ✅ STATIC QIBLA CARD */}
         {showQibla && (
           <Box sx={{ mt: 3 }}>
-            <PrayerCompassInline />
+            <QiblaStaticDirection />
           </Box>
         )}
 
@@ -73,9 +73,7 @@ const Home = ({ onAuthAction }) => {
                   p: 2,
                   border: "1px solid",
                   borderColor: "divider",
-                  "&:hover": {
-                    backgroundColor: "rgba(13,148,136,0.05)"
-                  }
+                  "&:hover": { backgroundColor: "rgba(13,148,136,0.05)" }
                 }}
               >
                 <CardContent sx={{ p: 0 }}>
@@ -88,6 +86,7 @@ const Home = ({ onAuthAction }) => {
                   >
                     {item.icon}
                   </Box>
+
                   <Typography variant="body2" fontWeight={600}>
                     {item.title}
                   </Typography>
@@ -97,7 +96,7 @@ const Home = ({ onAuthAction }) => {
           ))}
         </Grid>
 
-        {/* ✅ CTA (IF NOT LOGGED IN) */}
+        {/* ✅ CTA FOR NON‑LOGGED USER */}
         {!user && (
           <Box sx={{ textAlign: "center", mt: 4 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -110,6 +109,7 @@ const Home = ({ onAuthAction }) => {
             >
               Create an account to save prayer history and reminders.
             </Typography>
+
             <Typography
               onClick={() => onAuthAction?.("register")}
               sx={{
